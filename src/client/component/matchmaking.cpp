@@ -60,6 +60,7 @@ namespace matchmaking
 			DEFINE_MATCH_FIELD(game::match_settings_t, walker_gear),
 			DEFINE_MATCH_FIELD(game::match_settings_t, rank),
 			DEFINE_MATCH_FIELD(game::match_settings_t, has_password),
+			DEFINE_MATCH_FIELD(game::match_settings_t, host_comment),
 		};
 
 		std::unordered_map<std::string, match_field_t> match_rules_fields =
@@ -94,6 +95,17 @@ namespace matchmaking
 		{
 			std::memcpy(&match->match_settings, settings, sizeof(game::match_settings_t));
 			create_lobby_hook.invoke<void>(match, &match->match_settings);
+		}
+
+		void update_match_settings()
+		{
+			const auto match_container = game::s_mgoMatchMakingManager->match_container;
+			if (match_container == nullptr || match_container->match == nullptr)
+			{
+				return;
+			}
+
+			std::memcpy(&match_container->match->match_settings, &match_settings, sizeof(game::match_settings_t));
 		}
 
 		void create_lobby_stub(game::mgo_match_t* match, game::match_settings_t* settings)
@@ -151,6 +163,7 @@ namespace matchmaking
 			}
 
 			set_field(&match_settings.rules.slots[slot_number], iter->second, value);
+			update_match_settings();
 		}
 
 		void set_match_setting(const std::string& field, const int value)
@@ -163,6 +176,7 @@ namespace matchmaking
 			}
 
 			set_field(&match_settings, iter->second, value);
+			update_match_settings();
 		}
 
 		void set_match_rule(const std::string& field, const int value)
@@ -175,16 +189,7 @@ namespace matchmaking
 			}
 
 			set_field(&match_settings.rules, iter->second, value);
-		}
-
-		void update_match_settings()
-		{
-			if (game::s_mgoMatchMakingManager->match_container == nullptr)
-			{
-				return;
-			}
-
-			std::memcpy(&game::s_mgoMatchMakingManager->match_container->match->match_settings, &match_settings, sizeof(game::match_settings_t));
+			update_match_settings();
 		}
 
 		std::atomic_bool request_match_start = false;
@@ -225,8 +230,10 @@ namespace matchmaking
 			{
 				console::info("[MgoMatchmakingManager] Rotating match...\n");
 
-				utils::hook::invoke<void>(SELECT_VALUE_LANG(0x148D00CE0, 0x147DF7DE0));
-				game::s_mgoMatchMakingManager->state = 21;
+				game::s_mgoMatchMakingManager->__pad3[20] = 1;
+				game::s_mgoMatchMakingManager->__pad4[4] = 1;
+				game::s_mgoMatchMakingManager->__pad5[2] = 1;
+				game::s_mgoMatchMakingManager->unk3 = 1;
 			}
 
 			if (request_disconnect)
@@ -387,6 +394,44 @@ namespace matchmaking
 			var_match_min_players = vars::register_int("match_min_players", 2, 0, 16, vars::var_flag_saved, "match minimum players override");
 			var_match_max_players = vars::register_int("match_max_players", 16, 0, 16, vars::var_flag_saved, "match maximum players override");
 			var_match_briefing_time = vars::register_int("match_briefing_time", 60, 0, 600, vars::var_flag_saved, "match briefing time override (seconds)");
+		
+			command::add("matchset", [](const command::params& params)
+			{
+				if (params.size() < 3)
+				{
+					printf("usage: matchset <name> <value>\n");
+					return;
+				}
+
+				set_match_setting(params.get(1), params.get_int(2));
+			});
+
+			command::add("matchsetrule", [](const command::params& params)
+			{
+				if (params.size() < 3)
+				{
+					printf("usage: matchsetrule <name> <value>\n");
+					return;
+				}
+
+				set_match_rule(params.get(1), params.get_int(2));
+			});
+
+			command::add("matchsetslot", [](const command::params& params)
+			{
+				if (params.size() < 3)
+				{
+					printf("usage: matchsetslot <index> <name> <value>\n");
+					return;
+				}
+
+				set_slot_field(params.get_int(1), params.get(2), params.get_int(3));
+			});
+
+			command::add("matchstart", [](const command::params& params)
+			{
+				request_match_start = true;
+			});
 		}
 
 		void start() override
@@ -448,47 +493,28 @@ namespace matchmaking
 				}, scheduler::main, 1s);
 			});
 
-			command::add("matchstart", [](const command::params& params)
-			{
-				request_match_start = true;
-			});
-
 			command::add("matchrotate", [](const command::params& params)
 			{
-				request_match_rotate = true;
-			});
-
-			command::add("matchset", [](const command::params& params)
-			{
-				if (params.size() < 3)
+				auto match = game::s_mgoMatchMakingManager->match_container;
+				if (match == nullptr)
 				{
-					printf("usage: matchset <name> <value>\n");
 					return;
 				}
 
-				set_match_setting(params.get(1), params.get_int(2));
-			});
+				const auto steam_matchmaking = (*game::SteamMatchmaking)();
+				steam_matchmaking->__vftable->SetLobbyData(steam_matchmaking, 
+					match->match->lobby_id2, "st_is_transition", "1");
 
-			command::add("matchsetrule", [](const command::params& params)
-			{
-				if (params.size() < 3)
+				scheduler::once([&]
 				{
-					printf("usage: matchsetrule <name> <value>\n");
-					return;
-				}
+					match = game::s_mgoMatchMakingManager->match_container;
+					if (match == nullptr)
+					{
+						return;
+					}
 
-				set_match_rule(params.get(1), params.get_int(2));
-			});
-
-			command::add("matchsetslot", [](const command::params& params)
-			{
-				if (params.size() < 3)
-				{
-					printf("usage: matchsetslot <index> <name> <value>\n");
-					return;
-				}
-
-				set_slot_field(params.get_int(1), params.get(2), params.get_int(3));
+					request_match_rotate = true;
+				}, scheduler::session, 500ms);
 			});
 
 			command::add("matchsetstate", [](const command::params& params)
