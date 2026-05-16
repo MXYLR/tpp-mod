@@ -4,6 +4,7 @@
 #include "game/game.hpp"
 
 #include "custom_server.hpp"
+#include "fobs.hpp"
 #include "vars.hpp"
 #include "console.hpp"
 
@@ -46,7 +47,29 @@ namespace server_logging
 		{
 			const auto res = http_codec_end_decode_hook.invoke<void*>(this_, ctx, buffer);
 
-			if (var_server_logging->current.enabled())
+			// First check if fobs needs to process the response
+			if (fobs::should_process_dispatch_response())
+			{
+				const auto fake_response = fobs::get_fake_dispatch_response();
+				const auto fake_response_str = fake_response.dump();
+				const auto buf = game::fox::Buffer_::GetBuffer(buffer);
+				const auto buf_size = game::fox::Buffer_::GetSize(buffer);
+
+				if (fake_response_str.size() <= buf_size)
+				{
+					std::memcpy(buf, fake_response_str.data(), fake_response_str.size());
+					std::memset(buf + fake_response_str.size(), 0, buf_size - fake_response_str.size());
+
+					console::info("[Dispatch] Intercepted and replaced response (100% success)");
+				}
+				else
+				{
+					console::warn("[Dispatch] Fake response too large for buffer");
+				}
+
+				fobs::clear_pending_dispatch();
+			}
+			else if (var_server_logging->current.enabled())
 			{
 				const auto data = get_fox_buffer(buffer);
 				const auto json = nlohmann::json::parse(data);
@@ -63,16 +86,26 @@ namespace server_logging
 
 		void* http_codec_begin_encode_stub(void* this_, void* ctx, game::fox::Buffer* buffer, void* session_key)
 		{
-			if (var_server_logging->current.enabled())
+			try
 			{
 				const auto data = get_fox_buffer(buffer);
 				const auto json = nlohmann::json::parse(data);
 				const auto cmd = json["msgid"].get<std::string>();
 
-				console::info("[server logging] sending request for command \"%s\"", cmd.data());
+				// Let fobs process the request first
+				const auto intercepted = fobs::process_dispatch_request(cmd, json);
 
-				const auto path = get_dump_path(cmd, true);
-				utils::io::write_file(path, json.dump(4));
+				if (!intercepted && var_server_logging->current.enabled())
+				{
+					console::info("[server logging] sending request for command \"%s\"", cmd.data());
+
+					const auto path = get_dump_path(cmd, true);
+					utils::io::write_file(path, json.dump(4));
+				}
+			}
+			catch (const std::exception& e)
+			{
+				console::debug("[server logging] Error: %s", e.what());
 			}
 
 			return http_codec_begin_encode_hook.invoke<void*>(this_, ctx, buffer, session_key);

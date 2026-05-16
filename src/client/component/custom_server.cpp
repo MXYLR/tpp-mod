@@ -174,6 +174,11 @@ namespace custom_server
 		return custom_url[0] != 0;
 	}
 
+	const char* get_custom_url()
+	{
+		return custom_url;
+	}
+
 	class component final : public component_interface
 	{
 	public:
