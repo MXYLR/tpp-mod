@@ -19,7 +19,7 @@ namespace command
 {
 	namespace
 	{
-		std::unordered_map<std::string, callback> commands;
+		std::unordered_map<std::string, command_info> commands;
 		std::unordered_map<std::string, std::string> aliases;
 
 		std::mutex queue_mutex;
@@ -107,7 +107,7 @@ namespace command
 
 			try
 			{
-				command->second(args);
+				command->second.handler(args);
 			}
 			catch (const std::exception& e)
 			{
@@ -370,18 +370,24 @@ namespace command
 		}
 	}
 
-	void add(const std::string& name, const callback& cb)
+	void add(const std::string& name, const callback& cb,
+		const std::string& description, const std::string& usage)
 	{
 		console::info("Registering console command \"%s\"\n", name.data());
-		commands.insert(std::make_pair(name, cb));
+		command_info info{};
+		info.handler = cb;
+		info.description = description;
+		info.usage = usage;
+		commands.insert(std::make_pair(name, info));
 	}
 
-	void add(const std::string& name, const callback_narg& cb)
+	void add(const std::string& name, const callback_narg& cb,
+		const std::string& description, const std::string& usage)
 	{
 		add(name, [cb](const command::params&)
 		{
 			cb();
-		});
+		}, description, usage);
 	}
 
 	std::optional<std::string> find_command_name(const std::string& input)
@@ -465,7 +471,7 @@ namespace command
 		return res;
 	}
 
-	std::unordered_map<std::string, callback>& get_commands()
+	std::unordered_map<std::string, command_info>& get_commands()
 	{
 		return commands;
 	}
@@ -539,7 +545,63 @@ namespace command
 		{
 			scheduler::loop(run_frame, scheduler::main);
 
-			command::add("quit", game::tpp::ui::utility::UiUtilityImpl_::CallFoxQuit);
+			command::add("help", [](const command::params& params)
+			{
+				if (params.size() >= 2)
+				{
+					const auto& cmd_map = get_commands();
+					const auto cmd_name = utils::string::to_lower(params.get(1));
+					const auto iter = cmd_map.find(cmd_name);
+					
+					if (iter != cmd_map.end())
+					{
+						const auto& info = iter->second;
+						console::info("Help for: %s", cmd_name.data());
+						if (!info.usage.empty())
+						{
+							console::info("Usage: %s", info.usage.data());
+						}
+						if (!info.description.empty())
+						{
+							console::info("Description: %s", info.description.data());
+						}
+						if (info.usage.empty() && info.description.empty())
+						{
+							console::info("No help available for this command");
+						}
+					}
+					else
+					{
+						console::warn("Command \"%s\" not found", cmd_name.data());
+					}
+					return;
+				}
+
+				console::info("Available commands:");
+				console::info("----------------------------------------");
+				
+				const auto& cmd_map = get_commands();
+				for (const auto& [name, info] : cmd_map)
+				{
+					if (!info.description.empty())
+					{
+						console::info("  %-20s - %s", name.data(), info.description.data());
+					}
+					else
+					{
+						console::info("  %s", name.data());
+					}
+				}
+				
+				console::info("----------------------------------------");
+				console::info("Use 'help <command>' for detailed help");
+			},
+			"Show help for commands",
+			"help [command]");
+
+			command::add("quit", game::tpp::ui::utility::UiUtilityImpl_::CallFoxQuit,
+				"Quit the game",
+				"quit");
 
 			command::add("startsound", [](const command::params& params)
 			{
@@ -564,7 +626,9 @@ namespace command
 				}
 
 				game::tpp::ui::utility::StartSound(sound_control, id);
-			});
+			},
+			"Start playing a sound",
+			"startsound <sound_id>");
 
 			command::add("stopsound", [](const command::params& params)
 			{
@@ -589,13 +653,17 @@ namespace command
 				}
 
 				game::tpp::ui::utility::StopSound(sound_control, id);
-			});
+			},
+			"Stop playing a sound",
+			"stopsound <sound_id>");
 
 			// console hint
 			command::add("wait", []()
 			{
 
-			});
+			},
+			"Wait for specified milliseconds before executing next command",
+			"wait <milliseconds>");
 
 			if (game::environment::is_tpp())
 			{
@@ -603,7 +671,9 @@ namespace command
 				{
 					utils::nt::start_process("mgsvmgo.exe");
 					utils::nt::terminate();
-				});
+				},
+				"Launch MGO (Metal Gear Online)",
+				"startmgo");
 			}
 			else
 			{
@@ -611,7 +681,9 @@ namespace command
 				{
 					utils::nt::start_process("mgsvtpp.exe");
 					utils::nt::terminate();
-				});
+				},
+				"Launch TPP (The Phantom Pain)",
+				"starttpp");
 			}
 		}
 	};

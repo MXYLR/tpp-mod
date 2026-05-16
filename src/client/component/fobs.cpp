@@ -4,6 +4,7 @@
 #include "game/game.hpp"
 
 #include "fobs.hpp"
+#include "fob_target.hpp"
 #include "vars.hpp"
 #include "console.hpp"
 #include "scheduler.hpp"
@@ -12,15 +13,319 @@
 #include <utils/string.hpp>
 #include <utils/concurrency.hpp>
 
+#include <random>
+#include <chrono>
+#include <ctime>
+#include <unordered_map>
+#include <string>
+
 namespace fobs
 {
 	namespace
 	{
 		vars::var_ptr var_fob_security_challenge_mode;
+		vars::var_ptr var_fob_override_list_type;
+		vars::var_ptr var_fob_override_list_mode;
+		vars::var_ptr var_dispatch_intercept_mode;
+		vars::var_ptr var_dispatch_success_rate;
+
+		std::string pending_list_type;
+
+		bool dispatch_intercept_enabled()
+		{
+			return var_dispatch_intercept_mode->current.get_int() == 1;
+		}
+
+		enum class dispatch_command_type
+		{
+			unknown,
+			sneak_mother_base,
+			check_defence_motherbase,
+			abort_mother_base,
+			deploy_mission,
+			send_troops,
+			cancel_combat_deploy,
+			cancel_combat_deploy_single,
+			elapse_combat_deploy,
+			get_combat_deploy_list,
+			get_combat_deploy_result,
+		};
+
+		struct pending_dispatch_t
+		{
+			bool active = false;
+			std::string command_name;
+			dispatch_command_type type = dispatch_command_type::unknown;
+			nlohmann::json fake_response;
+		};
+
+		std::unordered_map<std::string, dispatch_command_type> dispatch_command_map =
+		{
+			{"CMD_SNEAK_MOTHER_BASE", dispatch_command_type::sneak_mother_base},
+			{"CMD_CHECK_DEFENCE_MOTHERBASE", dispatch_command_type::check_defence_motherbase},
+			{"CMD_ABORT_MOTHER_BASE", dispatch_command_type::abort_mother_base},
+			{"CMD_DEPLOY_MISSION", dispatch_command_type::deploy_mission},
+			{"CMD_SEND_TROOPS", dispatch_command_type::send_troops},
+			{"CMD_CANCEL_COMBAT_DEPLOY", dispatch_command_type::cancel_combat_deploy},
+			{"CMD_CANCEL_COMBAT_DEPLOY_SINGLE", dispatch_command_type::cancel_combat_deploy_single},
+			{"CMD_ELAPSE_COMBAT_DEPLOY", dispatch_command_type::elapse_combat_deploy},
+			{"CMD_GET_COMBAT_DEPLOY_LIST", dispatch_command_type::get_combat_deploy_list},
+			{"CMD_GET_COMBAT_DEPLOY_RESULT", dispatch_command_type::get_combat_deploy_result},
+		};
+
+		pending_dispatch_t pending_dispatch;
 
 		bool custom_lobbies_enabled()
 		{
 			return var_fob_security_challenge_mode->current.get_int() == 1;
+		}
+
+		bool should_override_list(const std::string& list_type)
+		{
+			const auto override_type = var_fob_override_list_type->current.get_int();
+			if (override_type == 0)
+			{
+				return false;
+			}
+
+			static const std::unordered_map<int, std::string> type_map =
+			{
+				{1, "TRIAL"},
+				{2, "PICKUP"},
+				{3, "PICKUP_HIGH"},
+				{4, "ENEMY"},
+				{5, "EVENT"},
+				{6, "NUCLEAR"},
+				{7, "FOLLOW"},
+				{8, "FOLLOWER"},
+				{9, "DEPLOYED"},
+				{10, "INJURY"},
+				{11, "EMERGENCY"},
+				{12, "FR_ENEMY"},
+			};
+
+			const auto iter = type_map.find(override_type);
+			if (iter == type_map.end())
+			{
+				return false;
+			}
+
+			return list_type == iter->second;
+		}
+
+		bool should_replace_list()
+		{
+			return var_fob_override_list_mode->current.get_int() == 0;
+		}
+
+		std::string get_fox_buffer(game::fox::Buffer* buffer)
+		{
+			const auto buf = game::fox::Buffer_::GetBuffer(buffer);
+			const auto buf_size = game::fox::Buffer_::GetSize(buffer);
+			const auto data = std::string{buf, buf + buf_size};
+			return data;
+		}
+
+		nlohmann::json create_fake_sneak_response(const nlohmann::json& request)
+		{
+			nlohmann::json result;
+			result["result"] = "NOERR";
+
+			result["damage_param"] = nlohmann::json::array();
+			result["event_fob_params"] = {0, 0, 0, 0, 0};
+
+			result["fob_deploy_damage_param"]["cluster_index"] = 0;
+			result["fob_deploy_damage_param"]["expiration_date"] = 0;
+			result["fob_deploy_damage_param"]["motherbase_id"] = 0;
+			for (auto i = 0; i < 16; i++)
+			{
+				result["fob_deploy_damage_param"]["damage_values"][i] = 0;
+			}
+
+			result["is_event"] = request.contains("is_event") ? request["is_event"].get<int>() : 0;
+			result["is_security_contract"] = 0;
+			result["owner_gmp"] = 0;
+
+			result["recover_resource"]["biotic_resource"] = 0;
+			result["recover_resource"]["common_metal"] = 0;
+			result["recover_resource"]["fuel_resource"] = 0;
+			result["recover_resource"]["minor_metal"] = 0;
+			result["recover_resource"]["precious_metal"] = 0;
+
+			result["recover_soldier"] = nlohmann::json::array();
+			result["recover_soldier_count"] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+			result["recover_soldier_num"] = 0;
+			result["reward_id"] = 0;
+			result["reward_soldier"] = nlohmann::json::array();
+			result["reward_soldier_num"] = 0;
+			result["reward_soldier_rank"] = 0;
+			result["reward_soldier_type"] = 0;
+
+			result["security_soldier"] = nlohmann::json::array();
+			result["security_soldier_num"] = 0;
+			result["security_soldier_rank"] = 0;
+
+			auto& stage_param = result["stage_param"];
+
+			stage_param["cluster_param"] = nlohmann::json::object();
+			stage_param["build"] = {0, 0, 0, 0, 0, 0, 0};
+			stage_param["construct_param"] = 0;
+			stage_param["fob_index"] = 0;
+			stage_param["mother_base_id"] = request.contains("mother_base_id") ? request["mother_base_id"].get<std::uint64_t>() : 0;
+			stage_param["nuclear"] = 0;
+			stage_param["owner_player_id"] = request.contains("player_id") ? request["player_id"].get<std::uint64_t>() : 0;
+
+			stage_param["placement"]["emplacement_gun_east"] = 0;
+			stage_param["placement"]["emplacement_gun_west"] = 0;
+			stage_param["placement"]["gatling_gun"] = 0;
+			stage_param["placement"]["gatling_gun_east"] = 0;
+			stage_param["placement"]["gatling_gun_west"] = 0;
+			stage_param["placement"]["mortar_normal"] = 0;
+
+			stage_param["platform"] = request.contains("platform") ? request["platform"].get<int>() : 0;
+			stage_param["equip_grade"] = 50;
+			stage_param["security_level"] = 50;
+
+			stage_param["processing_resource"]["fuel_resource"] = 0;
+			stage_param["processing_resource"]["biotic_resource"] = 0;
+			stage_param["processing_resource"]["common_metal"] = 0;
+			stage_param["processing_resource"]["minor_metal"] = 0;
+			stage_param["processing_resource"]["precious_metal"] = 0;
+
+			stage_param["section_level"]["base_development"] = 50;
+			stage_param["section_level"]["command"] = 50;
+			stage_param["section_level"]["combat"] = 50;
+			stage_param["section_level"]["intelligence"] = 50;
+			stage_param["section_level"]["medical"] = 50;
+			stage_param["section_level"]["rd"] = 50;
+			stage_param["section_level"]["support"] = 50;
+
+			stage_param["usable_resource"]["fuel_resource"] = 0;
+			stage_param["usable_resource"]["biotic_resource"] = 0;
+			stage_param["usable_resource"]["common_metal"] = 0;
+			stage_param["usable_resource"]["minor_metal"] = 0;
+			stage_param["usable_resource"]["precious_metal"] = 0;
+
+			result["wormhole_player_id"] = request.contains("wormhole_player_id") ? request["wormhole_player_id"].get<std::uint64_t>() : 0;
+
+			return result;
+		}
+
+		nlohmann::json create_fake_check_defence_response(const nlohmann::json& request)
+		{
+			nlohmann::json result;
+			result["result"] = "NOERR";
+			result["check_result"] = 0;
+			return result;
+		}
+
+		nlohmann::json create_fake_abort_mother_base_response(const nlohmann::json& request)
+		{
+			nlohmann::json result;
+			result["result"] = "NOERR";
+			return result;
+		}
+
+		nlohmann::json create_fake_deploy_mission_response(const nlohmann::json& request)
+		{
+			nlohmann::json result;
+			result["result"] = "NOERR";
+			result["deploy_id"] = 1;
+			result["arrival_date"] = static_cast<std::int64_t>(std::time(nullptr)) + 60;
+			return result;
+		}
+
+		nlohmann::json create_fake_send_troops_response(const nlohmann::json& request)
+		{
+			nlohmann::json result;
+			result["result"] = "NOERR";
+			result["deploy_id"] = 1;
+			return result;
+		}
+
+		nlohmann::json create_fake_cancel_combat_deploy_response(const nlohmann::json& request)
+		{
+			nlohmann::json result;
+			result["result"] = "NOERR";
+			return result;
+		}
+
+		nlohmann::json create_fake_elapse_combat_deploy_response(const nlohmann::json& request)
+		{
+			nlohmann::json result;
+			result["result"] = "NOERR";
+			result["result_list"] = nlohmann::json::array();
+			result["result_num"] = 0;
+			return result;
+		}
+
+		nlohmann::json create_fake_get_combat_deploy_list_response(const nlohmann::json& request)
+		{
+			nlohmann::json result;
+			result["result"] = "NOERR";
+			result["deploy_list"] = nlohmann::json::array();
+			result["deploy_num"] = 0;
+			return result;
+		}
+
+		nlohmann::json create_fake_get_combat_deploy_result_response(const nlohmann::json& request)
+		{
+			nlohmann::json result;
+			result["result"] = "NOERR";
+			result["xuid"] = nlohmann::json::array();
+			result["result_list"] = nlohmann::json::array();
+			result["result_num"] = 0;
+			return result;
+		}
+
+		nlohmann::json create_fake_response(dispatch_command_type type, const nlohmann::json& request)
+		{
+			switch (type)
+			{
+			case dispatch_command_type::sneak_mother_base:
+				return create_fake_sneak_response(request);
+			case dispatch_command_type::check_defence_motherbase:
+				return create_fake_check_defence_response(request);
+			case dispatch_command_type::abort_mother_base:
+				return create_fake_abort_mother_base_response(request);
+			case dispatch_command_type::deploy_mission:
+				return create_fake_deploy_mission_response(request);
+			case dispatch_command_type::send_troops:
+				return create_fake_send_troops_response(request);
+			case dispatch_command_type::cancel_combat_deploy:
+			case dispatch_command_type::cancel_combat_deploy_single:
+				return create_fake_cancel_combat_deploy_response(request);
+			case dispatch_command_type::elapse_combat_deploy:
+				return create_fake_elapse_combat_deploy_response(request);
+			case dispatch_command_type::get_combat_deploy_list:
+				return create_fake_get_combat_deploy_list_response(request);
+			case dispatch_command_type::get_combat_deploy_result:
+				return create_fake_get_combat_deploy_result_response(request);
+			default:
+				{
+					nlohmann::json result;
+					result["result"] = "NOERR";
+					return result;
+				}
+			}
+		}
+
+		bool should_fake_success()
+		{
+			const auto success_rate = var_dispatch_success_rate->current.get_int();
+			if (success_rate <= 0)
+			{
+				return false;
+			}
+			if (success_rate >= 100)
+			{
+				return true;
+			}
+
+			std::random_device rd;
+			std::mt19937 gen(rd());
+			std::uniform_int_distribution<> dist(1, 100);
+			return dist(gen) <= success_rate;
 		}
 
 		void on_lobby_match_list(game::LobbyMatchList_t* match_list);
@@ -381,6 +686,8 @@ namespace fobs
 
 		char cmd_get_fob_target_list_option_pack_stub(game::tpp::net::CmdGetFobTargetListOption* option)
 		{
+			pending_list_type = option->type.data->buffer;
+
 			if (custom_lobbies_enabled() && option->type.data->buffer == "CHALLENGE"s)
 			{
 				state.access([&](state_t& s)
@@ -591,11 +898,162 @@ namespace fobs
 			return res;
 		}
 
+		void inject_custom_targets_to_fob_target(game::tpp::net::FobTarget* fob_target, short& current_idx)
+		{
+			const auto& custom_targets = fob_target::get_targets();
+
+			for (const auto& custom_target : custom_targets)
+			{
+				if (current_idx >= fob_target->maxPlayers)
+				{
+					break;
+				}
+
+				auto& player_info = fob_target->playerInfos[current_idx];
+
+				if (custom_target.has_cached_info)
+				{
+					std::memcpy(&player_info, &custom_target.cached_info, sizeof(player_info));
+					console::info("Injected custom target (from cache): %llu - player_id: %u, mother_base_num: %d, mother_base_id[0]: %u",
+						custom_target.steam_id, player_info.owner_player_id,
+						player_info.mother_base_num, player_info.mother_base_num > 0 ? player_info.mother_base_id[0] : 0);
+				}
+				else
+				{
+					std::memset(&player_info, 0, sizeof(player_info));
+
+					player_info.owner_account.id = custom_target.steam_id;
+					player_info.mother_base_num = 1;
+					player_info.owner_player_id = custom_target.player_id;
+
+					player_info.mother_base_id[0] = custom_target.mother_base_id;
+					player_info.area_id[0] = 0;
+					player_info.security_rank[0] = 50;
+					player_info.platform_count[0] = 32;
+					player_info.construct_param2[0] = 0;
+
+					player_info.owner_ugc = 1;
+					player_info.league_rank_grade = 4;
+					player_info.league_rank_rank = 1000;
+					player_info.sneak_rank_grade = 4;
+					player_info.sneak_rank_rank = 1000;
+					player_info.espionage_score = 0;
+					player_info.espionage_win = 0;
+					player_info.espionage_total = 0;
+
+					player_info.staff_num = 0;
+					for (auto o = 0; o < 10; o++)
+					{
+						player_info.staff_count[o] = 0;
+					}
+
+					player_info.usable_resource.fuel_resource = 100000;
+					player_info.usable_resource.biotic_resource = 100000;
+					player_info.usable_resource.common_metal = 100000;
+					player_info.usable_resource.minor_metal = 100000;
+					player_info.usable_resource.precious_metal = 100000;
+
+					player_info.nameplate_id = 0;
+
+					std::memset(&player_info.owner_emblem, 0, sizeof(game::tpp::mbm::PlayerBasicInfo::Emblem));
+
+					console::info("Injected custom target (default): %llu - player_id: %u, mother_base_id: %u",
+						custom_target.steam_id, custom_target.player_id, custom_target.mother_base_id);
+				}
+
+				game::tpp::net::DisplayName_::AddList(fob_target->displayName1, &player_info.owner_account);
+				current_idx++;
+			}
+		}
+
 		void fob_target_receive_enemy_basic_info_stub(game::tpp::net::FobTarget* fob_target, game::tpp::net::CmdGetFobTargetListResult<0>* list)
 		{
-			if (!custom_lobbies_enabled() || list->type.data->buffer != "CHALLENGE"s)
+			const auto current_list_type = pending_list_type;
+			pending_list_type.clear();
+
+			const bool is_override_list = should_override_list(current_list_type);
+			const bool is_replace_mode = should_replace_list();
+
+			console::info("[FOB] Requested list type: %s, override: %s, mode: %s",
+				current_list_type.c_str(),
+				is_override_list ? "YES" : "NO",
+				is_replace_mode ? "REPLACE" : "APPEND");
+
+			if (!custom_lobbies_enabled())
 			{
 				fob_target_receive_enemy_basic_info_hook.invoke<void>(fob_target, list);
+
+				console::info("[FOB] Caching players from official list...");
+
+				int cached_count = 0;
+				for (auto i = 0; i < fob_target->maxPlayers; i++)
+				{
+					const auto& player_info = fob_target->playerInfos[i];
+					if (player_info.owner_account.id == 0)
+					{
+						break;
+					}
+
+					fob_target::cache_player_info(player_info);
+					cached_count++;
+				}
+
+				console::info("[FOB] Cached %d players from official list", cached_count);
+
+				if (is_override_list && fob_target::has_custom_targets())
+				{
+					if (is_replace_mode)
+					{
+						console::info("[FOB] Replacing list with custom targets (%d)", fob_target::get_targets().size());
+
+						game::tpp::net::DisplayName_::ClearList(fob_target->displayName1);
+						game::tpp::net::DisplayName_::ClearList(fob_target->displayName2);
+
+						std::memset(fob_target->playerInfos, 0, sizeof(fob_target->playerInfos));
+
+						short current_idx = 0;
+						inject_custom_targets_to_fob_target(fob_target, current_idx);
+					}
+					else
+					{
+						console::info("[FOB] Appending custom targets to list");
+
+						short current_idx = 0;
+						for (auto i = 0; i < fob_target->maxPlayers; i++)
+						{
+							if (fob_target->playerInfos[i].owner_account.id == 0)
+							{
+								current_idx = static_cast<short>(i);
+								break;
+							}
+							current_idx = static_cast<short>(i + 1);
+						}
+
+						inject_custom_targets_to_fob_target(fob_target, current_idx);
+					}
+
+					game::tpp::net::DisplayName_::GetDisplayName(fob_target->displayName1);
+					game::tpp::net::DisplayName_::GetDisplayName(fob_target->displayName2);
+				}
+				else if (fob_target::has_custom_targets())
+				{
+					short current_idx = 0;
+
+					for (auto i = 0; i < fob_target->maxPlayers; i++)
+					{
+						if (fob_target->playerInfos[i].owner_account.id == 0)
+						{
+							current_idx = static_cast<short>(i);
+							break;
+						}
+						current_idx = static_cast<short>(i + 1);
+					}
+
+					inject_custom_targets_to_fob_target(fob_target, current_idx);
+					game::tpp::net::DisplayName_::GetDisplayName(fob_target->displayName1);
+					game::tpp::net::DisplayName_::GetDisplayName(fob_target->displayName2);
+				}
+
 				return;
 			}
 
@@ -606,6 +1064,7 @@ namespace fobs
 			{
 				const auto count = std::min(fob_target->maxPlayers, static_cast<short>(s.lobby_list.size()));
 
+				console::info("[FOB] Caching players from Steam lobby list...");
 				for (auto i = 0; i < count; i++)
 				{
 					fob_target->playerInfos[i].owner_account.id = s.lobby_list[i].owner_id.bits;
@@ -646,7 +1105,17 @@ namespace fobs
 
 					std::memcpy(&fob_target->playerInfos[i].owner_emblem, &s.lobby_list[i].emblem, sizeof(game::tpp::mbm::PlayerBasicInfo::Emblem));
 
+					fob_target::cache_player_info(fob_target->playerInfos[i]);
+
 					game::tpp::net::DisplayName_::AddList(fob_target->displayName1, &fob_target->playerInfos[i].owner_account);
+				}
+
+				console::info("[FOB] Cached %d players from Steam lobby list", count);
+
+				if (fob_target::has_custom_targets())
+				{
+					short current_idx = static_cast<short>(s.lobby_list.size());
+					inject_custom_targets_to_fob_target(fob_target, current_idx);
 				}
 			});
 
@@ -690,6 +1159,49 @@ namespace fobs
 		}
 	}
 
+	// Public interface for server_logging.cpp to call
+	bool process_dispatch_request(const std::string& cmd, const nlohmann::json& request)
+	{
+		if (!dispatch_intercept_enabled() || !should_fake_success())
+		{
+			return false;
+		}
+
+		const auto iter = dispatch_command_map.find(cmd);
+		if (iter == dispatch_command_map.end())
+		{
+			return false;
+		}
+
+		const auto type = iter->second;
+		console::info("[Dispatch] Intercepting %s request", cmd.c_str());
+
+		nlohmann::json request_data = request.contains("data") ? request["data"] : nlohmann::json::object();
+		pending_dispatch.fake_response = create_fake_response(type, request_data);
+		pending_dispatch.fake_response["msgid"] = cmd;
+		pending_dispatch.command_name = cmd;
+		pending_dispatch.type = type;
+		pending_dispatch.active = true;
+
+		console::info("[Dispatch] Created fake response for %s", cmd.c_str());
+		return true;
+	}
+
+	bool should_process_dispatch_response()
+	{
+		return pending_dispatch.active;
+	}
+
+	nlohmann::json get_fake_dispatch_response()
+	{
+		return pending_dispatch.fake_response;
+	}
+
+	void clear_pending_dispatch()
+	{
+		pending_dispatch.active = false;
+	}
+
 	class component final : public component_interface
 	{
 	public:
@@ -702,6 +1214,18 @@ namespace fobs
 
 			var_fob_security_challenge_mode = vars::register_int("fob_security_challenge_mode", 0, 0, 1,
 				vars::var_flag_saved, "security challenge mode (0 = konami, 1 = steam lobbies)");
+
+			var_fob_override_list_type = vars::register_int("fob_override_list_type", 0, 0, 12,
+				vars::var_flag_saved, "FOB list type to override (0=disabled, 1=TRIAL, 2=PICKUP, 3=PICKUP_HIGH, 4=ENEMY, 5=EVENT, 6=NUCLEAR, 7=FOLLOW, 8=FOLLOWER, 9=DEPLOYED, 10=INJURY, 11=EMERGENCY, 12=FR_ENEMY)");
+
+			var_fob_override_list_mode = vars::register_int("fob_override_list_mode", 0, 0, 1,
+				vars::var_flag_saved, "FOB list override mode (0=replace, 1=append)");
+
+			var_dispatch_intercept_mode = vars::register_int("dispatch_intercept_mode", 1, 0, 1,
+				vars::var_flag_saved, "Dispatch intercept mode (0 = disabled, 1 = enabled, 100% success rate)");
+
+			var_dispatch_success_rate = vars::register_int("dispatch_success_rate", 100, 0, 100,
+				vars::var_flag_saved, "Dispatch fake success rate (0-100, default 100)");
 		}
 
 		void start() override
