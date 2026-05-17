@@ -26,6 +26,7 @@ namespace fobs
 		vars::var_ptr var_fob_security_challenge_mode;
 		vars::var_ptr var_fob_override_list_type;
 		vars::var_ptr var_fob_override_list_mode;
+		vars::var_ptr var_fob_target_list_num;
 
 		std::string pending_list_type;
 
@@ -439,6 +440,14 @@ namespace fobs
 		char cmd_get_fob_target_list_option_pack_stub(game::tpp::net::CmdGetFobTargetListOption* option)
 		{
 			pending_list_type = option->type.data->buffer;
+
+			const auto custom_num = var_fob_target_list_num->current.get_int();
+			if (custom_num > 0)
+			{
+				console::info("[FOB] Overriding num parameter: %d -> %d (type=%s)",
+					option->num, custom_num, option->type.data->buffer);
+				option->num = custom_num;
+			}
 
 			if (custom_lobbies_enabled() && option->type.data->buffer == "CHALLENGE"s)
 			{
@@ -929,6 +938,9 @@ namespace fobs
 
 			var_fob_override_list_mode = vars::register_int("fob_override_list_mode", 0, 0, 1,
 				vars::var_flag_saved, "FOB list override mode (0=replace, 1=append)");
+
+			var_fob_target_list_num = vars::register_int("fob_target_list_num", 0, 0, 1000,
+				vars::var_flag_saved, "Override the num parameter sent in CMD_GET_FOB_TARGET_LIST (0 = disabled, use original value)");
 		}
 
 		void start() override
