@@ -249,7 +249,7 @@ namespace fob_target
 					console::info("Using cached info for %llu: player_id=%u, mother_base_id=%u, name=%s",
 						steam_id, player_id, mother_base_id, name.c_str());
 				}
-				else if (player_id == 0 || mother_base_id == 0)
+				else if (player_id == 0 && mother_base_id == 0)
 				{
 					console::warn("Player %llu not found in cache. Player may not be in any official FOB list yet.", steam_id);
 					console::warn("Browse FOB lists first to cache player info, or provide player_id and mother_base_id manually.");

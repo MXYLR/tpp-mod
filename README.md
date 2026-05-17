@@ -123,6 +123,7 @@ Can be executed from the console or in game console
 - `clearmutes`: unmute all players
 
 **FOB Commands**
+- `fob_add_support <steam_id>`: send CMD_ADD_FOLLOW request to add a player as support (use in Relationships -> Friends list -> click Support on any player to trigger)
 - `fob_add_target <steam_id> <player_id> <name>`: add a custom FOB target
 - `fob_remove_target <steam_id>`: remove a custom FOB target
 - `fob_clear_targets`: clear all custom FOB targets
