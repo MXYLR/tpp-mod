@@ -16,7 +16,7 @@ tpp-mod only supports original steam releases (latest), any kind of modified or 
 | mgsvtpp.exe (jpn, 1.0.15.3) | 3A87F626732158890A07688D32A2523CD8EADA71 | ✔️ |
 | mgsvmgo.exe (jpn, 1.1.2.7) | D6ADF7685B0F0639B2A949D0E96A06E853DAEEB8 | ✔️ |
 
-- Download [dinput8.dll](https://github.alicent.cat/tpp-mod/dinput8.dll) and copy it to the game folder.  
+- Download [dinput8.dll](https://github.com/MXYLR/tpp-mod/releases) from the release page and copy it to the game folder.  
 
 Configuration files are stored in `%localappdata%\tpp-mod`
 
@@ -50,7 +50,6 @@ Configuration files are stored in `%localappdata%\tpp-mod`
 - scale mouse sensitivity
 - disable intro splashscreens
 - **FOB custom targets and management**
-- **Dispatch intercept system (100% dispatch success rate)**
 
 ### Command list
 Can be executed from the console or in game console 
@@ -124,7 +123,6 @@ Can be executed from the console or in game console
 - `clearmutes`: unmute all players
 
 **FOB Commands**
-- `fob_connect <steam_id>`: connect to a specific FOB target by Steam ID (must be in FOB menu with list loaded)
 - `fob_add_target <steam_id> <player_id> <name>`: add a custom FOB target
 - `fob_remove_target <steam_id>`: remove a custom FOB target
 - `fob_clear_targets`: clear all custom FOB targets
@@ -132,8 +130,6 @@ Can be executed from the console or in game console
 - `fob_cache_list`: list all cached FOB targets
 - `fob_cache_clear`: clear FOB cache
 - `fob_query <query_type>`: query FOB targets (query types: ENEMY, PICKUP, PICKUP_HIGH, NUCLEAR, etc.)
-- `fob_follow <steam_id>`: follow a FOB target
-- `fob_unfollow <steam_id>`: unfollow a FOB target
 
 ### Variable list
 similar to cod dvars, can be set through the console or through the config files `%localappdata%/tpp-mod/config/`
@@ -151,8 +147,6 @@ similar to cod dvars, can be set through the console or through the config files
 - `fob_security_challenge_mode`: security challenge mode (0 = konami, 1 = steam lobbies)
 - `fob_override_list_type`: FOB list type to override (0=disabled, 1=TRIAL, 2=PICKUP, 3=PICKUP_HIGH, 4=ENEMY, 5=EVENT, 6=NUCLEAR, 7=FOLLOW, 8=FOLLOWER, 9=DEPLOYED, 10=INJURY, 11=EMERGENCY, 12=FR_ENEMY)
 - `fob_override_list_mode`: FOB list override mode (0=replace, 1=append)
-- `dispatch_intercept_mode`: Dispatch intercept mode (0 = disabled, 1 = enabled, 100% success rate)
-- `dispatch_success_rate`: Dispatch fake success rate (0-100, default 100)
 
 **Match Variables**
 - `match_enable_tweaks`: enable match settings tweaks (0/1)
