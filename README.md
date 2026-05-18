@@ -136,7 +136,10 @@ Can be executed from the console or in game console
 - `fob_convert_list_type <from> <to>`: convert the type field in CMD_GET_FOB_TARGET_LIST requests (e.g. `fob_convert_list_type PICKUP FOLLOW`)
 - `fob_status`: show current FOB status and configuration
 
-> **Blockade Bypass**: After a successful FOB infiltration, `CMD_SEND_SNEAK_RESULT` is automatically intercepted to set `retaliate_point` to 0, preventing the server from generating a blockade (no setup required).
+> **Blockade Bypass**: After a successful FOB infiltration, two automatic interceptions work together:
+> 1. `CMD_OPEN_WORMHOLE` → `flag` changed to `FRIENDLY`, `is_open` set to `0` (prevents retaliation wormhole)
+> 2. `CMD_SEND_SNEAK_RESULT` → `retaliate_point` set to `0`, `retaliate_wormhole` and `open_wormhole` set to `0` (prevents blockade generation)
+> No manual setup required — both interceptions happen automatically.
 
 **FOB List Types:**
 
