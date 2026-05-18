@@ -124,13 +124,36 @@ Can be executed from the console or in game console
 
 **FOB Commands**
 - `fob_add_support <steam_id>`: send CMD_ADD_FOLLOW request to add a player as support (use in Relationships -> Friends list -> click Support on any player to trigger)
-- `fob_add_target <steam_id> <player_id> <name>`: add a custom FOB target
+- `fob_add_target <steam_id>/<player_id>/<mother_base_id>`: add a custom FOB target with player ID or mother base ID or steam id.
 - `fob_remove_target <steam_id>`: remove a custom FOB target
 - `fob_clear_targets`: clear all custom FOB targets
 - `fob_target_list`: list all custom FOB targets
-- `fob_cache_list`: list all cached FOB targets
+- `fob_cache_list`: list all cached FOB targets (auto-populated when browsing FOB lists)
 - `fob_cache_clear`: clear FOB cache
 - `fob_query <query_type>`: query FOB targets (query types: ENEMY, PICKUP, PICKUP_HIGH, NUCLEAR, etc.)
+- `fob_open_wormhole <target_steam_id>`: open a wormhole to a target FOB (sends CMD_OPEN_WORMHOLE directly to Konami servers, automatically detects both your player_id and target's player_id from cache)
+- `fob_get_target_detail <target_steam_id>`: manually fetch FOB target details by steam_id (uses cached player info, sends CMD_GET_FOB_TARGET_DETAIL)
+- `fob_convert_list_type <from> <to>`: convert the type field in CMD_GET_FOB_TARGET_LIST requests (e.g. `fob_convert_list_type PICKUP FOLLOW`)
+- `fob_status`: show current FOB status and configuration
+
+> **Blockade Bypass**: After a successful FOB infiltration, `CMD_SEND_SNEAK_RESULT` is automatically intercepted to set `retaliate_point` to 0, preventing the server from generating a blockade (no setup required).
+
+**FOB List Types:**
+
+| Type | ID | Description |
+| --- | --- | --- |
+| TRIAL | 1 | Training / Visit Destination |
+| PICKUP | 2 | Infiltration Targets (PFs of equal grade) |
+| PICKUP_HIGH | 3 | Infiltration Targets (High-Ranking PFs) |
+| ENEMY | 4 | Retaliation Targets |
+| EVENT | 5 | Events |
+| NUCLEAR | 6 | Nuclear-equipped Targets |
+| FOLLOW | 7 | Supporting |
+| FOLLOWER | 8 | Supporters |
+| DEPLOYED | 9 | FOB Unit Deployed List |
+| INJURY | 10 | Intruder |
+| EMERGENCY | 11 | Emergency |
+| FR_ENEMY | 12 | Indirect Retaliation Targets |
 
 ### Variable list
 similar to cod dvars, can be set through the console or through the config files `%localappdata%/tpp-mod/config/`
@@ -145,9 +168,6 @@ similar to cod dvars, can be set through the console or through the config files
 - `net_server_heartbeat`: backend server heartbeat interval
 
 **FOB Variables**
-- `fob_security_challenge_mode`: security challenge mode (0 = konami, 1 = steam lobbies)
-- `fob_override_list_type`: FOB list type to override (0=disabled, 1=TRIAL, 2=PICKUP, 3=PICKUP_HIGH, 4=ENEMY, 5=EVENT, 6=NUCLEAR, 7=FOLLOW, 8=FOLLOWER, 9=DEPLOYED, 10=INJURY, 11=EMERGENCY, 12=FR_ENEMY)
-- `fob_override_list_mode`: FOB list override mode (0=replace, 1=append)
 
 **Match Variables**
 - `match_enable_tweaks`: enable match settings tweaks (0/1)
@@ -180,6 +200,7 @@ similar to cod dvars, can be set through the console or through the config files
 - `con_input_dvar_value_color`: console input dvar value color
 - `con_input_dvar_inactive_value_color`: console input dvar inactive value color
 - `con_input_cmd_match_color`: console input command match color
+- `console_log`: save console log to file (0/1, saved to tpp-mod/log/console.log)
 
 **Chat Variables**
 - `chat_enable`: enable mgo text chat (0/1, default: 1)
