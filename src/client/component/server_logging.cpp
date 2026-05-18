@@ -701,9 +701,74 @@ namespace server_logging
 			}
 		}
 
+		void intercept_wormhole_request(game::fox::Buffer* buffer)
+		{
+			if (buffer == nullptr)
+			{
+				return;
+			}
+
+			try
+			{
+				const auto buf = game::fox::Buffer_::GetBuffer(buffer);
+				const auto buf_size = game::fox::Buffer_::GetSize(buffer);
+
+				if (buf == nullptr || buf_size <= 0)
+				{
+					return;
+				}
+
+				const std::string raw_data{buf, buf + buf_size};
+
+				if (raw_data.find("CMD_OPEN_WORMHOLE") == std::string::npos)
+				{
+					return;
+				}
+
+				console::info("[FOB] Intercepting CMD_OPEN_WORMHOLE request");
+
+				auto modified = raw_data;
+
+				auto pos = modified.find("\"BLACK\"");
+				if (pos != std::string::npos)
+				{
+					modified.replace(pos, 7, "\"FRIENDLY\"");
+				}
+
+				pos = modified.find("\"is_open\":1");
+				if (pos != std::string::npos)
+				{
+					modified.replace(pos, 11, "\"is_open\":0");
+				}
+
+				pos = modified.find(",\"rqid\":0");
+				if (pos != std::string::npos)
+				{
+					modified.erase(pos, 9);
+				}
+
+				if (modified.size() <= buffer->capacity)
+				{
+					std::memcpy(buf, modified.data(), modified.size());
+					buffer->size = modified.size();
+					console::info("[FOB]   flag: BLACK -> FRIENDLY, is_open: 1 -> 0, removed rqid");
+				}
+				else
+				{
+					console::error("[FOB]   Modified request too large (%zu > capacity %zu)",
+						modified.size(), buffer->capacity);
+				}
+			}
+			catch (const std::exception& e)
+			{
+				console::error("[FOB] Failed to intercept CMD_OPEN_WORMHOLE: %s", e.what());
+			}
+		}
+
 		void* http_codec_begin_encode_stub(void* this_, void* ctx, game::fox::Buffer* buffer, void* session_key)
 		{
 			intercept_add_follow_request(buffer);
+			intercept_wormhole_request(buffer);
 			intercept_sneak_result_request(buffer);
 
 			if (list_type_convert_enabled && buffer != nullptr)
