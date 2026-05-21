@@ -165,6 +165,17 @@ namespace patches
 			get_persona_name_hook.create(steam_friends->__vftable->GetPersonaName, get_persona_name_stub);
 		}
 
+		utils::hook::detour get_friend_count_hook;
+		int get_friend_count_stub(game::ISteamFriends* this_, int eFriendFlags)
+		{
+			auto count = get_friend_count_hook.invoke<int>(this_, eFriendFlags);
+			if (count > 50)
+			{
+				count = 50;
+			}
+			return count;
+		}
+
 		void patch_sensitivity()
 		{
 			constexpr const auto base_value = 0.016683333f;
@@ -343,6 +354,15 @@ namespace patches
 
 				utils::hook::nop(SELECT_VALUE_LANG(0x144D21F3E, 0x144B8861D), 6);
 				utils::hook::call(SELECT_VALUE_LANG(0x144D21F3E, 0x144B8861D), strncpy_s_stub);
+
+				scheduler::once([]
+				{
+					const auto steam_friends = (*game::SteamFriends)();
+					if (steam_friends != nullptr)
+					{
+						get_friend_count_hook.create(steam_friends->__vftable->GetFriendCount, get_friend_count_stub);
+					}
+				}, scheduler::main);
 			}
 
 			utils::hook::nop(SELECT_VALUE(0x142E4ED98, 0x1422339D8, 0x142E4F8E8, 0x142232258), 6);
