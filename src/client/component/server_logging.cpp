@@ -31,6 +31,7 @@ namespace server_logging
 
 		vars::var_ptr var_server_logging;
 		vars::var_ptr var_net_server_heartbeat;
+		vars::var_ptr var_fob_intercept_wormhole;
 
 		std::uint64_t add_follow_override_steam_id = 0;
 		std::uint64_t add_follow_override_player_id = 0;
@@ -285,17 +286,17 @@ namespace server_logging
 				}
 
 				nlohmann::json wormhole_json;
-				wormhole_json["flag"] = "BLACK";
+				wormhole_json["flag"] = "FRIENDLY";
 				wormhole_json["is_open"] = 1;
 				wormhole_json["msgid"] = "CMD_OPEN_WORMHOLE";
-				wormhole_json["player_id"] = target_player_id;
+				wormhole_json["player_id"] = my_player_id;
 				wormhole_json["retaliate_score"] = 252;
 				wormhole_json["rqid"] = 0;
-				wormhole_json["to_player_id"] = my_player_id;
+				wormhole_json["to_player_id"] = target_player_id;
 
 				console::info("[TPP Client] Opening wormhole:");
-				console::info("[TPP Client]   player_id (target): %llu", target_player_id);
-				console::info("[TPP Client]   to_player_id (me): %llu", my_player_id);
+				console::info("[TPP Client]   player_id (me): %llu", my_player_id);
+				console::info("[TPP Client]   to_player_id (target): %llu", target_player_id);
 
 				return send_command(wormhole_json, false);
 			}
@@ -445,36 +446,10 @@ namespace server_logging
 			return std::string{buf, buf + buf_size};
 		}
 
-
-
-		void auto_detect_my_player_id(const nlohmann::json& json, const std::string& cmd)
-		{
-			try
-			{
-				if (cmd == "CMD_GET_FOB_TARGET_LIST")
-				{
-					if (json.contains("target_list") && json["target_list"].is_array() && !json["target_list"].empty())
-					{
-						const auto& first_target = json["target_list"][0];
-
-						if (first_target.contains("attacker_info") && first_target["attacker_info"].contains("player_id"))
-						{
-							const auto attacker_player_id = first_target["attacker_info"]["player_id"].get<std::uint64_t>();
-							if (attacker_player_id != 0)
-							{
-								console::info("[FOB] Auto-detected my player_id: %llu", attacker_player_id);
-							}
-						}
-					}
-				}
-			}
-			catch (...)
-			{
-			}
-		}
-
 		void* http_codec_end_decode_stub(void* this_, void* ctx, game::fox::Buffer* buffer)
 		{
+			const auto res = http_codec_end_decode_hook.invoke<void*>(this_, ctx, buffer);
+
 			{
 				const auto raw_data = get_fox_buffer(buffer);
 
@@ -502,11 +477,11 @@ namespace server_logging
 						}
 					}
 
-					auto_detect_my_player_id(json, cmd);
 
 					if (var_server_logging->current.enabled())
 					{
 						const auto modified_data = json.dump(-1);
+
 						if (modified_data.size() <= buffer->capacity)
 						{
 							std::memcpy(game::fox::Buffer_::GetBuffer(buffer), modified_data.data(), modified_data.size());
@@ -524,22 +499,20 @@ namespace server_logging
 						utils::io::write_file(raw_path, modified_data);
 					}
 				}
-			}
 
-			const auto res = http_codec_end_decode_hook.invoke<void*>(this_, ctx, buffer);
-
-			if (var_server_logging->current.enabled())
-			{
-				try
+				if (var_server_logging->current.enabled())
 				{
-					const auto json = nlohmann::json::parse(get_fox_buffer(buffer));
-					const auto cmd = json.value("msgid", "unknown");
+					try
+					{
+						const auto encrypted_json = nlohmann::json::parse(get_fox_buffer(buffer));
+						const auto encrypted_cmd = encrypted_json.value("msgid", "unknown");
 
-					const auto encrypted_path = get_encrypted_dump_path(cmd, false);
-					utils::io::write_file(encrypted_path, get_fox_buffer(buffer));
-				}
-				catch (...)
-				{
+						const auto encrypted_path = get_encrypted_dump_path(encrypted_cmd, false);
+						utils::io::write_file(encrypted_path, get_fox_buffer(buffer));
+					}
+					catch (...)
+					{
+					}
 				}
 			}
 
@@ -625,84 +598,13 @@ namespace server_logging
 			console::info("[FOB]   Go to Relationships menu -> Friends list -> select any player -> click 'Support' to trigger.");
 		}
 
-		void intercept_sneak_result_request(game::fox::Buffer* buffer)
+		void intercept_wormhole_request(game::fox::Buffer* buffer)
 		{
-			if (buffer == nullptr)
+			if (!var_fob_intercept_wormhole || !var_fob_intercept_wormhole->current.enabled())
 			{
 				return;
 			}
 
-			try
-			{
-				const auto buf = game::fox::Buffer_::GetBuffer(buffer);
-				const auto buf_size = game::fox::Buffer_::GetSize(buffer);
-
-				if (buf == nullptr || buf_size <= 0)
-				{
-					return;
-				}
-
-				const std::string raw_data{buf, buf + buf_size};
-
-				if (raw_data.find("CMD_SEND_SNEAK_RESULT") == std::string::npos)
-				{
-					return;
-				}
-
-				console::info("[FOB] Intercepting CMD_SEND_SNEAK_RESULT request");
-
-				auto modified = raw_data;
-
-				auto pos = modified.find("\"retaliate_point\":");
-				if (pos != std::string::npos)
-				{
-					const auto val_start = pos + 18;
-					auto val_end = val_start;
-					while (val_end < modified.size() && std::isdigit(static_cast<unsigned char>(modified[val_end])))
-					{
-						++val_end;
-					}
-
-					const auto old_val = modified.substr(val_start, val_end - val_start);
-					modified.replace(val_start, val_end - val_start, "0");
-
-					console::info("[FOB]   retaliate_point: %s -> 0", old_val.c_str());
-				}
-
-				pos = modified.find("\"retaliate_wormhole\":");
-				if (pos != std::string::npos)
-				{
-					const auto val_start = pos + 20;
-					modified.replace(val_start, 1, "0");
-				}
-
-				pos = modified.find("\"open_wormhole\":");
-				if (pos != std::string::npos)
-				{
-					const auto val_start = pos + 15;
-					modified.replace(val_start, 1, "0");
-				}
-
-				if (modified.size() <= buffer->capacity)
-				{
-					std::memcpy(buf, modified.data(), modified.size());
-					buffer->size = modified.size();
-					console::info("[FOB]   retaliate_point->0, retaliate_wormhole->0, open_wormhole->0");
-				}
-				else
-				{
-					console::error("[FOB]   Modified request too large (%zu > capacity %zu)",
-						modified.size(), buffer->capacity);
-				}
-			}
-			catch (const std::exception& e)
-			{
-				console::error("[FOB] Failed to intercept CMD_SEND_SNEAK_RESULT: %s", e.what());
-			}
-		}
-
-		void intercept_wormhole_request(game::fox::Buffer* buffer)
-		{
 			if (buffer == nullptr)
 			{
 				return;
@@ -725,38 +627,40 @@ namespace server_logging
 					return;
 				}
 
+				if (raw_data.find("\"BLACK\"") != std::string::npos)
+				{
+					return;
+				}
+
 				console::info("[FOB] Intercepting CMD_OPEN_WORMHOLE request");
 
 				auto modified = raw_data;
 
-				auto pos = modified.find("\"BLACK\"");
+				auto pos = modified.find("\"FRIENDLY\"");
 				if (pos != std::string::npos)
 				{
-					modified.replace(pos, 7, "\"FRIENDLY\"");
-				}
+					modified.replace(pos, 9, "\"BLACK\"");
 
-				pos = modified.find("\"is_open\":1");
-				if (pos != std::string::npos)
-				{
-					modified.replace(pos, 11, "\"is_open\":0");
-				}
+					pos = modified.find(",\"rqid\"");
+					if (pos != std::string::npos)
+					{
+						modified.replace(pos, 9, "");
+					}
 
-				pos = modified.find(",\"rqid\":0");
-				if (pos != std::string::npos)
-				{
-					modified.erase(pos, 9);
-				}
+					modified += ",\"retaliate_score\":6";
 
-				if (modified.size() <= buffer->capacity)
-				{
-					std::memcpy(buf, modified.data(), modified.size());
-					buffer->size = modified.size();
-					console::info("[FOB]   flag: BLACK -> FRIENDLY, is_open: 1 -> 0, removed rqid");
-				}
-				else
-				{
-					console::error("[FOB]   Modified request too large (%zu > capacity %zu)",
-						modified.size(), buffer->capacity);
+					if (modified.size() <= buffer->capacity)
+					{
+						std::memcpy(buf, modified.data(), modified.size());
+						buffer->size = modified.size();
+						console::info("[FOB]   FRIENDLY -> BLACK, added retaliate_score:6 (size: %zu <= cap: %zu)",
+							modified.size(), buffer->capacity);
+					}
+					else
+					{
+						console::error("[FOB]   Modified request too large (%zu > capacity %zu)",
+							modified.size(), buffer->capacity);
+					}
 				}
 			}
 			catch (const std::exception& e)
@@ -769,7 +673,33 @@ namespace server_logging
 		{
 			intercept_add_follow_request(buffer);
 			intercept_wormhole_request(buffer);
-			intercept_sneak_result_request(buffer);
+
+			if (buffer != nullptr)
+			{
+				try
+				{
+					const auto buf = game::fox::Buffer_::GetBuffer(buffer);
+					const auto buf_size = game::fox::Buffer_::GetSize(buffer);
+
+					if (buf != nullptr && buf_size > 0)
+					{
+						const std::string raw{buf, buf + buf_size};
+						auto json = nlohmann::json::parse(raw, nullptr, false);
+						if (!json.is_discarded() && json.is_object() && json.contains("msgid") &&
+							json["msgid"].is_string() && json["msgid"].get<std::string>() == "CMD_SEND_SNEAK_RESULT")
+						{
+							const auto dp = json.value("damage_point", 0);
+							const auto rp = json.value("retaliate_point", 0);
+							const auto result = json.value("sneak_result", "?");
+							console::info("[FOB] CMD_SEND_SNEAK_RESULT: result=%s, damage_point=%d, retaliate_point=%d",
+								result.c_str(), dp, rp);
+						}
+					}
+				}
+				catch (...)
+				{
+				}
+			}
 
 			if (list_type_convert_enabled && buffer != nullptr)
 			{
@@ -894,6 +824,7 @@ namespace server_logging
 		{
 			var_server_logging = vars::register_bool("net_server_logging", false, vars::var_flag_saved, "enable server logging");
 			var_net_server_heartbeat = vars::register_int("net_server_heartbeat", 0, 0, std::numeric_limits<int>::max(), 0, "backend server heartbeat interval");
+			var_fob_intercept_wormhole = vars::register_bool("fob_intercept_wormhole", false, vars::var_flag_saved, "intercept CMD_OPEN_WORMHOLE (flag=FRIENDLY, is_open=0)");
 		}
 
 		void start() override
