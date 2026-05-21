@@ -148,8 +148,6 @@ Can be executed from the console or in game console
 > 2. Browse FOB lists to populate the cache with target players
 > 3. Use `fob_open_wormhole <target_steam_id>` in the console
 > 4. Return to FOB menu and re-select the target
-> 
-> **`fob_intercept_wormhole` variable**: When enabled, intercepts `CMD_OPEN_WORMHOLE` requests from the game client. Changes `flag` from `FRIENDLY` to `BLACK` and adds `retaliate_score:6`. This can be used to modify wormhole behavior.
 
 **FOB List Types:**
 

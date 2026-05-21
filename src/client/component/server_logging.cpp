@@ -31,7 +31,6 @@ namespace server_logging
 
 		vars::var_ptr var_server_logging;
 		vars::var_ptr var_net_server_heartbeat;
-		vars::var_ptr var_fob_intercept_wormhole;
 
 		std::uint64_t add_follow_override_steam_id = 0;
 		std::uint64_t add_follow_override_player_id = 0;
@@ -598,81 +597,9 @@ namespace server_logging
 			console::info("[FOB]   Go to Relationships menu -> Friends list -> select any player -> click 'Support' to trigger.");
 		}
 
-		void intercept_wormhole_request(game::fox::Buffer* buffer)
-		{
-			if (!var_fob_intercept_wormhole || !var_fob_intercept_wormhole->current.enabled())
-			{
-				return;
-			}
-
-			if (buffer == nullptr)
-			{
-				return;
-			}
-
-			try
-			{
-				const auto buf = game::fox::Buffer_::GetBuffer(buffer);
-				const auto buf_size = game::fox::Buffer_::GetSize(buffer);
-
-				if (buf == nullptr || buf_size <= 0)
-				{
-					return;
-				}
-
-				const std::string raw_data{buf, buf + buf_size};
-
-				if (raw_data.find("CMD_OPEN_WORMHOLE") == std::string::npos)
-				{
-					return;
-				}
-
-				if (raw_data.find("\"BLACK\"") != std::string::npos)
-				{
-					return;
-				}
-
-				console::info("[FOB] Intercepting CMD_OPEN_WORMHOLE request");
-
-				auto modified = raw_data;
-
-				auto pos = modified.find("\"FRIENDLY\"");
-				if (pos != std::string::npos)
-				{
-					modified.replace(pos, 9, "\"BLACK\"");
-
-					pos = modified.find(",\"rqid\"");
-					if (pos != std::string::npos)
-					{
-						modified.replace(pos, 9, "");
-					}
-
-					modified += ",\"retaliate_score\":6";
-
-					if (modified.size() <= buffer->capacity)
-					{
-						std::memcpy(buf, modified.data(), modified.size());
-						buffer->size = modified.size();
-						console::info("[FOB]   FRIENDLY -> BLACK, added retaliate_score:6 (size: %zu <= cap: %zu)",
-							modified.size(), buffer->capacity);
-					}
-					else
-					{
-						console::error("[FOB]   Modified request too large (%zu > capacity %zu)",
-							modified.size(), buffer->capacity);
-					}
-				}
-			}
-			catch (const std::exception& e)
-			{
-				console::error("[FOB] Failed to intercept CMD_OPEN_WORMHOLE: %s", e.what());
-			}
-		}
-
 		void* http_codec_begin_encode_stub(void* this_, void* ctx, game::fox::Buffer* buffer, void* session_key)
 		{
 			intercept_add_follow_request(buffer);
-			intercept_wormhole_request(buffer);
 
 			if (buffer != nullptr)
 			{
@@ -824,7 +751,6 @@ namespace server_logging
 		{
 			var_server_logging = vars::register_bool("net_server_logging", false, vars::var_flag_saved, "enable server logging");
 			var_net_server_heartbeat = vars::register_int("net_server_heartbeat", 0, 0, std::numeric_limits<int>::max(), 0, "backend server heartbeat interval");
-			var_fob_intercept_wormhole = vars::register_bool("fob_intercept_wormhole", false, vars::var_flag_saved, "intercept CMD_OPEN_WORMHOLE (flag=FRIENDLY, is_open=0)");
 		}
 
 		void start() override
