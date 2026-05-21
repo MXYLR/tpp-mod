@@ -1049,4 +1049,23 @@ namespace server_logging
 	};
 }
 
+
 REGISTER_COMPONENT(server_logging::component)
+
+namespace server_logging
+{
+	bool open_wormhole(std::uint64_t target_player_id, std::uint64_t my_player_id)
+	{
+		if (!tpp_client_instance_.has_session_key())
+		{
+			console::error("[FOB Wormhole] No session key available!");
+			return false;
+		}
+		return tpp_client_instance_.open_wormhole(target_player_id, my_player_id);
+	}
+
+	bool has_session_key()
+	{
+		return tpp_client_instance_.has_session_key();
+	}
+}

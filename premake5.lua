@@ -310,6 +310,7 @@ project "client"
 
 	resincludedirs {"$(ProjectDir)src"}
 
+	imgui.import()
 	links {"common"}
 	prebuildcommands {"pushd %{_MAIN_SCRIPT_DIR}", "tools\\premake5 generate-buildinfo", "popd"}
 
