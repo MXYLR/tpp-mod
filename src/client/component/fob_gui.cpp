@@ -6,8 +6,6 @@
 #include "command.hpp"
 #include "console.hpp"
 #include "vars.hpp"
-#include "scheduler.hpp"
-#include "patches.hpp"
 
 #include <utils/hook.hpp>
 #include <utils/nt.hpp>
@@ -41,47 +39,6 @@ namespace fob_control
 		uint64_t target_player_id = 0;
 		uint64_t target_steam_id = 0;
 		uint64_t my_player_id = 0;
-
-		struct FriendEntry
-		{
-			std::string name;
-			uint64_t steam_id;
-		};
-		std::mutex friends_mutex;
-		std::vector<FriendEntry> cached_friends;
-		bool friends_cache_dirty = true;
-
-		void refresh_friends_cache()
-		{
-			scheduler::once([]
-			{
-				const auto steam_friends = (*game::SteamFriends)();
-				if (steam_friends == nullptr)
-					return;
-
-				int count = patches::get_real_friend_count(steam_friends, 4);
-
-				std::vector<FriendEntry> new_list;
-				game::steam_id sid{};
-
-				for (int i = 0; i < count; ++i)
-				{
-					FriendEntry entry;
-					sid = steam_friends->__vftable->GetFriendByIndex(steam_friends, i, 4);
-					const char* name = steam_friends->__vftable->GetFriendPersonaName(steam_friends, sid);
-					entry.name = (name ? name : "");
-					entry.steam_id = sid.bits;
-					new_list.push_back(entry);
-				}
-
-				{
-					std::lock_guard<std::mutex> lock(friends_mutex);
-					cached_friends = std::move(new_list);
-					friends_cache_dirty = false;
-				}
-			}, scheduler::main);
-		}
-
 
 		constexpr const wchar_t* PIPE_NAME = L"\\\\.\\pipe\\TPPMod_FOBControl";
 		constexpr DWORD PIPE_BUFFER_SIZE = 8192;
@@ -482,26 +439,6 @@ namespace fob_control
 						<< target.mother_base_id;
 				}
 				return oss.str();
-			}
-			if (cmd == "GET_ALL_FRIENDS")
-			{
-				std::ostringstream oss;
-				bool first = true;
-				{
-					std::lock_guard<std::mutex> lock(friends_mutex);
-					for (const auto& entry : cached_friends)
-					{
-						if (!first) oss << "||";
-						first = false;
-						oss << entry.name << "|" << entry.steam_id;
-					}
-				}
-				return oss.str();
-			}
-			if (cmd == "REFRESH_FRIENDS")
-			{
-				refresh_friends_cache();
-				return "OK";
 			}
 			return "UNKNOWN";
 		}
