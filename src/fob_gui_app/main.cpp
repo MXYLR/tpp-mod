@@ -126,6 +126,29 @@ namespace fob_gui
 	std::atomic<bool> show_targets_dialog{ false };
 	std::vector<FobTargetInfo> fob_targets;
 
+	struct FriendInfo
+	{
+		std::string name;
+		uint64_t steam_id;
+	};
+
+	std::atomic<bool> show_all_friends_dialog{ false };
+	std::vector<FriendInfo> all_friends;
+
+	struct VarEntry
+	{
+		std::string name;
+		int type;
+		std::string current_value;
+		std::string description;
+	};
+
+	std::atomic<bool> show_vars_dialog{ false };
+	std::vector<VarEntry> vars_list;
+	char var_set_name[128] = "";
+	char var_set_value[128] = "";
+	std::string vars_status_msg;
+
 	HANDLE g_pipe_handle = INVALID_HANDLE_VALUE;
 
 	bool send_command(const std::string& cmd, std::string& response)
@@ -266,6 +289,21 @@ namespace fob_gui
 
 		std::lock_guard<std::mutex> lock(data_mutex);
 		commands_list = new_list;
+		// Add virtual commands (GUI-only features)
+		{
+			CommandInfo info;
+			info.name = "refresh_info";
+			info.description = "Reload player ID and session status from the DLL";
+			info.usage = "refresh_info";
+			commands_list.push_back(info);
+		}
+		{
+			CommandInfo info;
+			info.name = "all_friends";
+			info.description = "Fetch all Steam friends (bypasses game 50 limit)";
+			info.usage = "all_friends";
+			commands_list.push_back(info);
+		}
 		filtered_cmds.clear();
 		for (const auto& c : commands_list)
 		{
@@ -521,6 +559,116 @@ namespace fob_gui
 		fob_targets = new_list;
 	}
 
+	void fetch_all_friends()
+	{
+		if (!connected.load())
+			return;
+
+		// Trigger a cache refresh on the game's main thread
+		std::string dummy;
+		send_command("REFRESH_FRIENDS", dummy);
+
+		// Wait for the game thread to process and cache the friend list
+		std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
+		std::string response;
+		if (!send_command("GET_ALL_FRIENDS", response))
+			return;
+
+		std::vector<FriendInfo> new_list;
+
+		size_t pos = 0;
+		while (pos < response.size())
+		{
+			size_t end_pos = response.find("||", pos);
+			std::string friend_entry;
+			if (end_pos == std::string::npos)
+			{
+				friend_entry = response.substr(pos);
+				pos = response.size();
+			}
+			else
+			{
+				friend_entry = response.substr(pos, end_pos - pos);
+				pos = end_pos + 2;
+			}
+
+			if (friend_entry.empty())
+				continue;
+
+			size_t sep = friend_entry.find("|");
+			if (sep != std::string::npos)
+			{
+				try
+				{
+					FriendInfo info;
+					info.name = friend_entry.substr(0, sep);
+					info.steam_id = std::stoull(friend_entry.substr(sep + 1));
+					new_list.push_back(info);
+				}
+				catch (...) {}
+			}
+		}
+		all_friends = new_list;
+	}
+
+	void fetch_vars()
+	{
+		if (!connected.load())
+			return;
+
+		std::string response;
+		if (!send_command("GET_VARS", response))
+			return;
+
+		std::vector<VarEntry> new_list;
+
+		size_t pos = 0;
+		while (pos < response.size())
+		{
+			size_t end_pos = response.find("||", pos);
+			std::string var_entry;
+			if (end_pos == std::string::npos)
+			{
+				var_entry = response.substr(pos);
+				pos = response.size();
+			}
+			else
+			{
+				var_entry = response.substr(pos, end_pos - pos);
+				pos = end_pos + 2;
+			}
+
+			if (var_entry.empty())
+				continue;
+
+			size_t p1 = var_entry.find("|");
+			size_t p2 = var_entry.find("|", p1 + 1);
+			size_t p3 = var_entry.find("|", p2 + 1);
+			if (p1 != std::string::npos && p2 != std::string::npos)
+			{
+				try
+				{
+					VarEntry info;
+					info.name = var_entry.substr(0, p1);
+					info.type = std::stoi(var_entry.substr(p1 + 1, p2 - p1 - 1));
+					if (p3 != std::string::npos)
+					{
+						info.current_value = var_entry.substr(p2 + 1, p3 - p2 - 1);
+						info.description = var_entry.substr(p3 + 1);
+					}
+					else
+					{
+						info.current_value = var_entry.substr(p2 + 1);
+					}
+					new_list.push_back(info);
+				}
+				catch (...) {}
+			}
+		}
+		vars_list = new_list;
+	}
+
 	void heartbeat_thread_main()
 	{
 		while (!should_exit.load())
@@ -688,6 +836,27 @@ namespace fob_gui
 		{
 			fetch_fob_targets();
 			show_targets_dialog.store(true);
+			return;
+		}
+
+		if (cmd == "refresh_info")
+		{
+			update_info();
+			set_status("Info refreshed");
+			return;
+		}
+
+		if (cmd == "all_friends")
+		{
+			fetch_all_friends();
+			show_all_friends_dialog.store(true);
+			return;
+		}
+
+		if (cmd == "var_list")
+		{
+			fetch_vars();
+			show_vars_dialog.store(true);
 			return;
 		}
 
@@ -981,11 +1150,228 @@ namespace fob_gui
 		}
 	}
 
+	void render_all_friends_dialog()
+	{
+		if (!show_all_friends_dialog.load())
+			return;
+
+		ImGui::OpenPopup("All Friends");
+		ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+		ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+		ImGui::SetNextWindowSize(ImVec2(popup_w(), popup_h()), ImGuiCond_Appearing);
+
+		if (ImGui::BeginPopupModal("All Friends", nullptr, ImGuiWindowFlags_NoResize))
+		{
+			if (ImGui::Button("Refresh", ImVec2(btn_w(), btn_h())))
+			{
+				fetch_all_friends();
+			}
+			ImGui::SameLine();
+			ImGui::Text("(%zu)", all_friends.size());
+
+			ImGui::Separator();
+
+			float child_h = ImGui::GetContentRegionAvail().y - btn_h() - ImGui::GetStyle().ItemSpacing.y;
+			if (ImGui::BeginChild("##all_friends_list", ImVec2(0, child_h), true))
+			{
+				for (size_t i = 0; i < all_friends.size(); ++i)
+				{
+					auto& friend_info = all_friends[i];
+					char label[64];
+					sprintf_s(label, "%s", friend_info.name.c_str());
+
+					ImVec2 item_size = ImVec2(ImGui::GetContentRegionAvail().x - btn_w() - ImGui::GetStyle().ItemSpacing.x, btn_h());
+					ImGui::Selectable(label, false, 0, item_size);
+
+					if (ImGui::IsItemHovered())
+					{
+						char sid_str[64];
+						sprintf_s(sid_str, "SteamID: %llu", friend_info.steam_id);
+						ImGui::SetTooltip("%s", sid_str);
+					}
+
+					ImGui::SameLine();
+					char copy_btn_label[64];
+					sprintf_s(copy_btn_label, "Copy##af%zu", i);
+					if (ImGui::Button(copy_btn_label, ImVec2(btn_w(), btn_h())))
+					{
+						ImGui::SetClipboardText(friend_info.name.c_str());
+					}
+					if (ImGui::IsItemHovered())
+					{
+						ImGui::SetTooltip("Copy name to clipboard");
+					}
+				}
+			}
+			ImGui::EndChild();
+
+			ImGui::Separator();
+			if (ImGui::Button("Close", ImVec2(btn_w(), btn_h())))
+			{
+				show_all_friends_dialog.store(false);
+				ImGui::CloseCurrentPopup();
+			}
+		}
+		ImGui::EndPopup();
+	}
+
+	void render_vars_dialog()
+	{
+		if (!show_vars_dialog.load())
+			return;
+
+		ImGui::OpenPopup("Variables");
+		ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+		ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+		ImGui::SetNextWindowSize(ImVec2(popup_w() + 100, popup_h() + 60), ImGuiCond_Appearing);
+
+		if (ImGui::BeginPopupModal("Variables", nullptr, ImGuiWindowFlags_NoResize))
+		{
+			if (ImGui::Button("Refresh", ImVec2(btn_w(), btn_h())))
+			{
+				fetch_vars();
+			}
+			if (ImGui::IsItemHovered())
+				ImGui::SetTooltip("Reload all variable values from the DLL");
+
+			ImGui::SameLine();
+			ImGui::Text("(%zu vars)", vars_list.size());
+
+			ImGui::Separator();
+
+			float child_h = ImGui::GetContentRegionAvail().y - 90 * scale_factor;
+			if (ImGui::BeginChild("##vars_list", ImVec2(0, child_h), true))
+			{
+				// Categorize by name prefix
+				struct VarCategory
+				{
+					std::string name;
+					std::string display;
+					std::vector<size_t> indices;
+				};
+
+				VarCategory categories[] = {
+					{"net_", "Network"},
+					{"match_", "Match"},
+					{"com_", "Performance"},
+					{"sensitivity", "Performance"},
+					{"camera_", "Performance"},
+					{"player_", "Performance"},
+					{"ui_skip", "Performance"},
+					{"ui_draw_", "UI"},
+					{"con_", "Console"},
+					{"console_log", "Console"},
+					{"chat_", "Chat"},
+					{"discord_", "Other"},
+					{"dsx_", "Other"},
+					{"name", "Other"},
+					{"staff_", "Other"},
+					{"lua_", "Other"},
+				};
+
+				// Group indices by category display name
+				std::unordered_map<std::string, std::vector<size_t>> cat_map;
+				std::vector<std::string> cat_order;
+
+				for (size_t i = 0; i < vars_list.size(); i++)
+				{
+					std::string cat = "Other";
+					for (const auto& c : categories)
+					{
+						if (vars_list[i].name.rfind(c.name, 0) == 0)
+						{
+							cat = c.display;
+							break;
+						}
+					}
+					if (cat_map.find(cat) == cat_map.end())
+					{
+						cat_order.push_back(cat);
+					}
+					cat_map[cat].push_back(i);
+				}
+
+				for (const auto& cat_name : cat_order)
+				{
+					if (ImGui::CollapsingHeader(cat_name.c_str(), ImGuiTreeNodeFlags_DefaultOpen))
+					{
+						for (auto idx : cat_map[cat_name])
+						{
+							const auto& var = vars_list[idx];
+							ImGui::PushID((int)idx);
+
+							ImGui::Text("%s", var.name.c_str());
+							ImGui::SameLine();
+							ImGui::TextDisabled("= %s", var.current_value.c_str());
+
+							if (!var.description.empty())
+							{
+								ImGui::TextDisabled("  %s", var.description.c_str());
+							}
+
+							ImGui::SameLine();
+							char set_btn[64];
+							snprintf(set_btn, sizeof(set_btn), "Set##v%zu", idx);
+							if (ImGui::SmallButton(set_btn))
+							{
+								strncpy_s(var_set_name, sizeof(var_set_name), var.name.c_str(), _TRUNCATE);
+							}
+
+							ImGui::PopID();
+						}
+					}
+				}
+			}
+			ImGui::EndChild();
+
+			ImGui::Separator();
+			ImGui::Text("Set variable:");
+			ImGui::SameLine();
+			ImGui::SetNextItemWidth(150 * scale_factor);
+			ImGui::InputText("##var_name", var_set_name, sizeof(var_set_name));
+			ImGui::SameLine();
+			ImGui::Text("=");
+			ImGui::SameLine();
+			ImGui::SetNextItemWidth(150 * scale_factor);
+			ImGui::InputText("##var_value", var_set_value, sizeof(var_set_value));
+			ImGui::SameLine();
+			if (ImGui::Button("Apply", ImVec2(btn_w(), btn_h())))
+			{
+				if (var_set_name[0] != '\0' && var_set_value[0] != '\0')
+				{
+					std::string cmd = "set " + std::string(var_set_name) + " " + std::string(var_set_value);
+					execute_tpp_command(cmd);
+					vars_status_msg = "Sent: " + cmd;
+				}
+			}
+			if (ImGui::IsItemHovered())
+				ImGui::SetTooltip("Execute 'set <name> <value>' on the tpp-mod DLL");
+
+			if (!vars_status_msg.empty())
+			{
+				ImGui::TextDisabled("%s", vars_status_msg.c_str());
+			}
+
+			ImGui::Separator();
+			if (ImGui::Button("Close", ImVec2(btn_w(), btn_h())))
+			{
+				show_vars_dialog.store(false);
+				ImGui::CloseCurrentPopup();
+			}
+			if (ImGui::IsItemHovered())
+				ImGui::SetTooltip("Close the variables dialog");
+
+			ImGui::EndPopup();
+		}
+	}
+
 	void render_gui()
 	{
 		render_convert_dialog();
 		render_cache_dialog();
 		render_targets_dialog();
+		render_all_friends_dialog();
+		render_vars_dialog();
 
 		ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
 		ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize, ImGuiCond_Always);
