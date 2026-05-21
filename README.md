@@ -17,8 +17,24 @@ tpp-mod only supports original steam releases (latest), any kind of modified or 
 | mgsvmgo.exe (jpn, 1.1.2.7) | D6ADF7685B0F0639B2A949D0E96A06E853DAEEB8 | ✔️ |
 
 - Download [dinput8.dll](https://github.com/MXYLR/tpp-mod/releases) from the release page and copy it to the game folder.
+- Download [fob-gui.exe](https://github.com/MXYLR/tpp-mod/releases) and place it in the game folder alongside dinput8.dll (optional, for the FOB GUI application).
 
 Configuration files are stored in `%localappdata%\tpp-mod`
+
+### FOB GUI Application
+
+The `fob-gui.exe` is an optional companion application that launches automatically with the game (via dinput8.dll) and provides a graphical interface for FOB-related operations:
+
+- **Wormhole management**: Enter target Steam ID and open wormholes to bypass FOB blockades
+- **Command execution**: Click any available tpp-mod command from the list with descriptions
+- **Console log viewer**: Real-time display of tpp-mod console logs with auto-scroll
+- **List type conversion**: Popup dialog to convert FOB list types (PICKUP -> FOLLOW, etc.)
+- **Cached players browser**: View all cached player info (name, Steam name, Steam ID, Player ID) with copy buttons
+- **Custom targets browser**: View all custom FOB targets with copy buttons
+- **Dynamic scaling**: Adjustable UI scale input box (0.5 - 5.0) for font and button sizes
+- **Maximize button**: Standard Windows maximize/restore button for switching between windowed and fullscreen
+
+The GUI communicates with dinput8.dll via a named pipe, so both files must be in the same directory. The GUI automatically closes when the game exits.
 
 ## Features
 
@@ -179,7 +195,7 @@ similar to cod dvars, can be set through the console or through the config files
 - `net_server_heartbeat`: backend server heartbeat interval
 
 **FOB Variables**
-- `fob_intercept_wormhole`: intercept CMD_OPEN_WORMHOLE (flag=FRIENDLY, is_open=0) (0/1)
+
 **Match Variables**
 - `match_enable_tweaks`: enable match settings tweaks (0/1)
 - `match_min_players`: match minimum players override (0-16, default: 2)
