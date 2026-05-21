@@ -7,8 +7,7 @@
 #include "console.hpp"
 #include "vars.hpp"
 #include "scheduler.hpp"
-
-#include <MinHook.h>
+#include "patches.hpp"
 
 #include <utils/hook.hpp>
 #include <utils/nt.hpp>
@@ -60,11 +59,7 @@ namespace fob_control
 				if (steam_friends == nullptr)
 					return;
 
-				// Temporarily disable the GetFriendCount hook to get the real count
-				auto* hook_target = steam_friends->__vftable->GetFriendCount;
-				MH_DisableHook(hook_target);
-				int count = steam_friends->__vftable->GetFriendCount(steam_friends, 4);
-				MH_EnableHook(hook_target);
+				int count = patches::get_real_friend_count(steam_friends, 4);
 
 				std::vector<FriendEntry> new_list;
 				game::steam_id sid{};
