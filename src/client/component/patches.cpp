@@ -263,22 +263,17 @@ namespace patches
 
 			utils::hook::jump(SELECT_VALUE(0x14101E599, 0x141016455, 0x14101E5E9, 0x141015B35), utils::hook::assemble(around_camera_update_parameter_stub), true);
 		}
-	}
 
-	utils::hook::detour get_friend_count_hook;
-	int get_friend_count_stub(game::ISteamFriends* this_, int eFriendFlags)
-	{
-		auto count = get_friend_count_hook.invoke<int>(this_, eFriendFlags);
-		if (count > 50)
+		utils::hook::detour get_friend_count_hook;
+		int get_friend_count_stub(game::ISteamFriends* this_, int eFriendFlags)
 		{
-			count = 50;
+			auto count = get_friend_count_hook.invoke<int>(this_, eFriendFlags);
+			if (count > 50)
+			{
+				count = 50;
+			}
+			return count;
 		}
-		return count;
-	}
-
-	int get_real_friend_count(game::ISteamFriends* steam_friends, int eFriendFlags)
-	{
-		return get_friend_count_hook.invoke<int>(steam_friends, eFriendFlags);
 	}
 
 	class component final : public component_interface

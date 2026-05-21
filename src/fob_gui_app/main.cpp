@@ -126,14 +126,9 @@ namespace fob_gui
 	std::atomic<bool> show_targets_dialog{ false };
 	std::vector<FobTargetInfo> fob_targets;
 
-	struct FriendInfo
-	{
-		std::string name;
-		uint64_t steam_id;
-	};
-
-	std::atomic<bool> show_all_friends_dialog{ false };
-	std::vector<FriendInfo> all_friends;
+	std::mutex pipe_mutex;
+	char scale_factor_buf[16] = "1.8";
+	std::atomic<float> font_scale{ 1.8f };
 
 	struct VarEntry
 	{
@@ -295,13 +290,6 @@ namespace fob_gui
 			info.name = "refresh_info";
 			info.description = "Reload player ID and session status from the DLL";
 			info.usage = "refresh_info";
-			commands_list.push_back(info);
-		}
-		{
-			CommandInfo info;
-			info.name = "all_friends";
-			info.description = "Fetch all Steam friends (bypasses game 50 limit)";
-			info.usage = "all_friends";
 			commands_list.push_back(info);
 		}
 		filtered_cmds.clear();
@@ -559,59 +547,6 @@ namespace fob_gui
 		fob_targets = new_list;
 	}
 
-	void fetch_all_friends()
-	{
-		if (!connected.load())
-			return;
-
-		// Trigger a cache refresh on the game's main thread
-		std::string dummy;
-		send_command("REFRESH_FRIENDS", dummy);
-
-		// Wait for the game thread to process and cache the friend list
-		std::this_thread::sleep_for(std::chrono::milliseconds(500));
-
-		std::string response;
-		if (!send_command("GET_ALL_FRIENDS", response))
-			return;
-
-		std::vector<FriendInfo> new_list;
-
-		size_t pos = 0;
-		while (pos < response.size())
-		{
-			size_t end_pos = response.find("||", pos);
-			std::string friend_entry;
-			if (end_pos == std::string::npos)
-			{
-				friend_entry = response.substr(pos);
-				pos = response.size();
-			}
-			else
-			{
-				friend_entry = response.substr(pos, end_pos - pos);
-				pos = end_pos + 2;
-			}
-
-			if (friend_entry.empty())
-				continue;
-
-			size_t sep = friend_entry.find("|");
-			if (sep != std::string::npos)
-			{
-				try
-				{
-					FriendInfo info;
-					info.name = friend_entry.substr(0, sep);
-					info.steam_id = std::stoull(friend_entry.substr(sep + 1));
-					new_list.push_back(info);
-				}
-				catch (...) {}
-			}
-		}
-		all_friends = new_list;
-	}
-
 	void fetch_vars()
 	{
 		if (!connected.load())
@@ -843,13 +778,6 @@ namespace fob_gui
 		{
 			update_info();
 			set_status("Info refreshed");
-			return;
-		}
-
-		if (cmd == "all_friends")
-		{
-			fetch_all_friends();
-			show_all_friends_dialog.store(true);
 			return;
 		}
 
@@ -1150,71 +1078,6 @@ namespace fob_gui
 		}
 	}
 
-	void render_all_friends_dialog()
-	{
-		if (!show_all_friends_dialog.load())
-			return;
-
-		ImGui::OpenPopup("All Friends");
-		ImVec2 center = ImGui::GetMainViewport()->GetCenter();
-		ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-		ImGui::SetNextWindowSize(ImVec2(popup_w(), popup_h()), ImGuiCond_Appearing);
-
-		if (ImGui::BeginPopupModal("All Friends", nullptr, ImGuiWindowFlags_NoResize))
-		{
-			if (ImGui::Button("Refresh", ImVec2(btn_w(), btn_h())))
-			{
-				fetch_all_friends();
-			}
-			ImGui::SameLine();
-			ImGui::Text("(%zu)", all_friends.size());
-
-			ImGui::Separator();
-
-			float child_h = ImGui::GetContentRegionAvail().y - btn_h() - ImGui::GetStyle().ItemSpacing.y;
-			if (ImGui::BeginChild("##all_friends_list", ImVec2(0, child_h), true))
-			{
-				for (size_t i = 0; i < all_friends.size(); ++i)
-				{
-					auto& friend_info = all_friends[i];
-					char label[64];
-					sprintf_s(label, "%s", friend_info.name.c_str());
-
-					ImVec2 item_size = ImVec2(ImGui::GetContentRegionAvail().x - btn_w() - ImGui::GetStyle().ItemSpacing.x, btn_h());
-					ImGui::Selectable(label, false, 0, item_size);
-
-					if (ImGui::IsItemHovered())
-					{
-						char sid_str[64];
-						sprintf_s(sid_str, "SteamID: %llu", friend_info.steam_id);
-						ImGui::SetTooltip("%s", sid_str);
-					}
-
-					ImGui::SameLine();
-					char copy_btn_label[64];
-					sprintf_s(copy_btn_label, "Copy##af%zu", i);
-					if (ImGui::Button(copy_btn_label, ImVec2(btn_w(), btn_h())))
-					{
-						ImGui::SetClipboardText(friend_info.name.c_str());
-					}
-					if (ImGui::IsItemHovered())
-					{
-						ImGui::SetTooltip("Copy name to clipboard");
-					}
-				}
-			}
-			ImGui::EndChild();
-
-			ImGui::Separator();
-			if (ImGui::Button("Close", ImVec2(btn_w(), btn_h())))
-			{
-				show_all_friends_dialog.store(false);
-				ImGui::CloseCurrentPopup();
-			}
-		}
-		ImGui::EndPopup();
-	}
-
 	void render_vars_dialog()
 	{
 		if (!show_vars_dialog.load())
@@ -1370,7 +1233,6 @@ namespace fob_gui
 		render_convert_dialog();
 		render_cache_dialog();
 		render_targets_dialog();
-		render_all_friends_dialog();
 		render_vars_dialog();
 
 		ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
