@@ -593,7 +593,9 @@ namespace binds
 			{
 				binds.clear();
 				write_binds();
-			});
+			},
+			    "Unbind all key bindings",
+			    "unbindall");
 
 			command::add("bind", [](const command::params& params)
 			{
@@ -605,7 +607,9 @@ namespace binds
 				const auto key = params.get(1);
 				const auto cmd = params.get(2);
 				bind_key(key, cmd, command);
-			});
+			},
+			    "Bind a key to execute a command",
+			    "bind <key> <command>");
 
 			command::add("remap", [](const command::params& params)
 			{
@@ -617,7 +621,9 @@ namespace binds
 				const auto key = params.get(1);
 				const auto key_2 = params.get(2);
 				remap_key(key, key_2);
-			});
+			},
+			    "Remap a key press to another key",
+			    "remap <from_key> <to_key>");
 
 			command::add("unbind", [](const command::params& params)
 			{
@@ -628,7 +634,9 @@ namespace binds
 
 				const auto key = params.get(1);
 				unbind_key(key);
-			});
+			},
+			    "Unbind a specific key binding",
+			    "unbind <key>");
 		}
 
 		void start() override

@@ -32,6 +32,8 @@ The `fob-gui.exe` is an optional companion application that launches automatical
 - **Cached players browser**: View all cached player info (name, Steam name, Steam ID, Player ID) with copy buttons
 - **Custom targets browser**: View all custom FOB targets with copy buttons
 - **Dynamic scaling**: Adjustable UI scale input box (0.5 - 5.0) for font and button sizes
+- **Variables browser**: Categorized view of all tpp-mod variables with current values, descriptions, and quick-set buttons
+- **All friends dialog**: Fetch and display all Steam friends (bypassing the in-game 50-player limit) with copy buttons
 - **Maximize button**: Standard Windows maximize/restore button for switching between windowed and fullscreen
 
 The GUI communicates with dinput8.dll via a named pipe, so both files must be in the same directory. The GUI automatically closes when the game exits.

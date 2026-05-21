@@ -496,7 +496,9 @@ namespace command
 				{
 					console::warn("cfg file \"%s\" not found\n", name.data());
 				}
-			});
+			},
+			"Execute commands from a .cfg file",
+			"exec <filename>");
 
 			command::add("alias", [](const params& params)
 			{
@@ -514,7 +516,9 @@ namespace command
 					aliases[name] = cmd;
 					binds::write_binds();
 				}
-			});
+			},
+			"Create an alias for a command, or list all aliases",
+			"alias [name] [command]");
 		}
 
 		void post_load() override

@@ -686,7 +686,9 @@ namespace vars
 
 					set_var(var, parsed_value.value(), var_source_external);
 				}
-			});
+			},
+			"Set a variable value (creates new variable if not found)",
+			"set <name> <value>");
 
 			command::add("reset", [](const command::params& params)
 			{
@@ -705,7 +707,9 @@ namespace vars
 				}
 
 				set_var(var, var->reset, vars::var_source_external);
-			});
+			},
+			"Reset a variable to its default value",
+			"reset <name>");
 
 			command::add("var_list", []
 			{
@@ -714,7 +718,9 @@ namespace vars
 					const auto current_str = var->current.to_string();
 					console::info("%s \"%s\"\n", var->name.data(), current_str.data());
 				}
-			});
+			},
+			"List all registered variables and their current values",
+			"var_list");
 		}
 
 		void post_load() override

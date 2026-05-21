@@ -375,7 +375,9 @@ namespace scripting
 			command::add("script_var", [](const command::params& params)
 			{
 				script_var_command(params);
-			});
+			},
+			"Get or set a Lua script variable",
+			"script_var <name> [value]");
 
 			command::add("script_exec", [](const command::params& params)
 			{
@@ -385,7 +387,9 @@ namespace scripting
 				}
 
 				script_exec(params.join(1));
-			});
+			},
+			"Execute a Lua script command",
+			"script_exec <lua_code>");
 
 			command::add("script_load", [](const command::params& params)
 			{
@@ -395,14 +399,18 @@ namespace scripting
 				}
 
 				load_script(params.get(1));
-			});
+			},
+			"Load and execute a Lua script file",
+			"script_load <filename>");
 
 			if (game::environment::is_tpp())
 			{
 				command::add("disconnect", []
 				{
 					script_exec("TppMission.GameOverAbortMission()");
-				});
+				},
+				"Abort the current mission (disconnect from TPP session)",
+				"disconnect");
 			}
 		}
 	};

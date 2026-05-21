@@ -157,3 +157,4 @@ tpp-server-emulator/
 
 # Runtime dump files
 server_dump/
+tpp-mod-crash-*/
