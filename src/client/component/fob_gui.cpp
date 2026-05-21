@@ -577,11 +577,6 @@ namespace fob_control
 				add_log_entry(type, message);
 			});
 
-			scheduler::once([]
-			{
-				refresh_friends_cache();
-			}, scheduler::main);
-
 			pipe_server_running.store(true);
 			pipe_server_thread = std::thread(pipe_server_main);
 			pipe_server_thread.detach();
