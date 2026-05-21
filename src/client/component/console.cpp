@@ -22,6 +22,9 @@ namespace console
 	{
 		std::recursive_mutex print_mutex;
 
+		std::mutex callback_mutex;
+		std::vector<print_callback> print_callbacks;
+
 		struct
 		{
 			bool kill;
@@ -138,6 +141,14 @@ namespace console
 				std::strftime(time_buf, sizeof(time_buf), "%Y-%m-%d %H:%M:%S", &tm_buf);
 				const auto log_line = std::string("[") + time_buf + "] " + message + "\n";
 				utils::io::write_file("tpp-mod/log/console.log", log_line, true);
+			}
+
+			{
+				std::lock_guard<std::mutex> cb_lock(callback_mutex);
+				for (const auto& cb : print_callbacks)
+				{
+					cb(type, message);
+				}
 			}
 
 			update();
@@ -449,6 +460,25 @@ namespace console
 			}
 		}
 	};
+
+	void add_print_callback(print_callback callback)
+	{
+		std::lock_guard<std::mutex> lock(callback_mutex);
+		print_callbacks.push_back(std::move(callback));
+	}
+
+	void remove_print_callback(const print_callback& callback)
+	{
+		std::lock_guard<std::mutex> lock(callback_mutex);
+		for (auto it = print_callbacks.begin(); it != print_callbacks.end(); ++it)
+		{
+			if (it->target<void(int, const std::string&)>() == callback.target<void(int, const std::string&)>())
+			{
+				print_callbacks.erase(it);
+				break;
+			}
+		}
+	}
 }
 
 REGISTER_COMPONENT(console::component)

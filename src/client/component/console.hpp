@@ -1,9 +1,15 @@
 #pragma once
 
 #include <utils/hook.hpp>
+#include <functional>
 
 namespace console
 {
+	using print_callback = std::function<void(int type, const std::string& message)>;
+
+	void add_print_callback(print_callback callback);
+	void remove_print_callback(const print_callback& callback);
+
 	enum console_type
 	{
 		con_type_error = 1,

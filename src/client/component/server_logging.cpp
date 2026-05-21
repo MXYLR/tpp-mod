@@ -376,7 +376,7 @@ namespace server_logging
 			return 0;
 		}
 
-		std::uint64_t get_my_player_id_from_cache()
+		std::uint64_t get_my_player_id_from_cache_impl()
 		{
 			try
 			{
@@ -386,13 +386,7 @@ namespace server_logging
 					const auto cached_player = fob_target::get_cached_player(my_steam_id);
 					if (cached_player.has_value())
 					{
-						console::info("[FOB] Found my player_id in cache: %llu (steam_id: %llu)",
-							cached_player->player_id, my_steam_id);
 						return cached_player->player_id;
-					}
-					else
-					{
-						console::info("[FOB] Could not find my player_id in cache (steam_id: %llu)", my_steam_id);
 					}
 				}
 			}
@@ -844,7 +838,7 @@ namespace server_logging
 					return;
 				}
 
-				auto my_player_id = get_my_player_id_from_cache();
+				auto my_player_id = get_my_player_id_from_cache_impl();
 				if (my_player_id == 0)
 				{
 					console::error("[FOB Wormhole] Could not find your player_id in cache.");
@@ -864,8 +858,8 @@ namespace server_logging
 				const auto target_player_id = target_cached->player_id;
 
 				console::info("[FOB Wormhole] Sending CMD_OPEN_WORMHOLE...");
-				console::info("[FOB Wormhole]   target_player_id: %llu", target_player_id);
-				console::info("[FOB Wormhole]   my_player_id:     %llu", my_player_id);
+				console::info("[FOB Wormhole]   target_player_id: %u", target_player_id);
+				console::info("[FOB Wormhole]   my_player_id:     %llu", (unsigned long long)my_player_id);
 
 				const bool success = tpp_client_instance_.open_wormhole(target_player_id, my_player_id);
 
@@ -1067,5 +1061,10 @@ namespace server_logging
 	bool has_session_key()
 	{
 		return tpp_client_instance_.has_session_key();
+	}
+
+	std::uint64_t get_my_player_id_from_cache()
+	{
+		return get_my_player_id_from_cache_impl();
 	}
 }
