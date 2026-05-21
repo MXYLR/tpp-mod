@@ -136,10 +136,20 @@ Can be executed from the console or in game console
 - `fob_convert_list_type <from> <to>`: convert the type field in CMD_GET_FOB_TARGET_LIST requests (e.g. `fob_convert_list_type PICKUP FOLLOW`)
 - `fob_status`: show current FOB status and configuration
 
-> **Blockade Bypass**: After a successful FOB infiltration, two automatic interceptions work together:
-> 1. `CMD_OPEN_WORMHOLE` → `flag` changed to `FRIENDLY`, `is_open` set to `0` (prevents retaliation wormhole)
-> 2. `CMD_SEND_SNEAK_RESULT` → `retaliate_point` set to `0`, `retaliate_wormhole` and `open_wormhole` set to `0` (prevents blockade generation)
-> No manual setup required — both interceptions happen automatically.
+> **Blockade Bypass**: The `fob_open_wormhole` command can be used to bypass FOB blockade by sending `CMD_OPEN_WORMHOLE` directly to the server. This creates a wormhole similar to the retaliation wormhole mechanism.
+> 
+> **Prerequisites for `fob_open_wormhole`**:
+> 1. Session key from `CMD_REQAUTH_HTTPS` (auto-captured when logging in)
+> 2. Your `player_id` in cache (auto-populated when accessing FOB menu)
+> 3. Target `player_id` in cache (auto-populated when browsing FOB lists)
+> 
+> **Usage**:
+> 1. Login to the game and access the FOB menu
+> 2. Browse FOB lists to populate the cache with target players
+> 3. Use `fob_open_wormhole <target_steam_id>` in the console
+> 4. Return to FOB menu and re-select the target
+> 
+> **`fob_intercept_wormhole` variable**: When enabled, intercepts `CMD_OPEN_WORMHOLE` requests from the game client. Changes `flag` from `FRIENDLY` to `BLACK` and adds `retaliate_score:6`. This can be used to modify wormhole behavior.
 
 **FOB List Types:**
 
@@ -171,7 +181,7 @@ similar to cod dvars, can be set through the console or through the config files
 - `net_server_heartbeat`: backend server heartbeat interval
 
 **FOB Variables**
-
+- `fob_intercept_wormhole`: intercept CMD_OPEN_WORMHOLE (flag=FRIENDLY, is_open=0) (0/1)
 **Match Variables**
 - `match_enable_tweaks`: enable match settings tweaks (0/1)
 - `match_min_players`: match minimum players override (0-16, default: 2)
