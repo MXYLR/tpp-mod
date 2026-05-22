@@ -200,7 +200,25 @@ namespace server_logging
 				if (response.has_value())
 				{
 					console::info("[TPP Client] Response received!");
-					std::string decrypted = decrypt_with_static(response.value());
+
+					const auto& raw = response.value();
+					if (raw.empty())
+					{
+						console::info("[TPP Client] Response body is empty, but request was sent. Treating as success.");
+						return std::string("");
+					}
+
+					std::string decrypted;
+					try
+					{
+						decrypted = decrypt_with_static(raw);
+					}
+					catch (...)
+					{
+						console::info("[TPP Client] Raw response (first 200 chars): %s", raw.substr(0, 200).c_str());
+						console::info("[TPP Client] Response not decryptable, but request was sent. Treating as success.");
+						return std::string("");
+					}
 
 					try
 					{
@@ -327,32 +345,6 @@ namespace server_logging
 				console::info("[TPP Client]   is_sneak: 1");
 
 				return send_command(json, false);
-			}
-
-			std::optional<std::string> get_fob_target_detail_and_save_response(std::uint64_t mother_base_id)
-			{
-				if (!has_session_key())
-				{
-					console::error("[TPP Client] No session key available!");
-					return {};
-				}
-
-				nlohmann::json json;
-				json["is_event"] = 0;
-				json["is_plus"] = 0;
-				json["is_sneak"] = 1;
-				json["is_steal"] = 0;
-				json["mgo_id"] = 0;
-				json["mode"] = "actual";
-				json["mother_base_id"] = mother_base_id;
-				json["msgid"] = "CMD_GET_FOB_TARGET_DETAIL";
-				json["platform"] = 0;
-				json["rqid"] = 0;
-
-				console::info("[TPP Client] Getting FOB target detail (saving response for injection):");
-				console::info("[TPP Client]   mother_base_id: %llu", mother_base_id);
-
-				return send_command_and_get_response(json, false);
 			}
 		};
 
@@ -1032,8 +1024,6 @@ namespace server_logging
 				console::info("fob_target cache count:  %zu",
 					fob_target::get_cached_players().size());
 				console::info("================================");
-				console::info("Use 'fob_override_list_type <N>' in FOB menu");
-				console::info("to see 'override: YES/NO' in console.");
 			},
 			"Show FOB status and configuration",
 			"fob_status");
