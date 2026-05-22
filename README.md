@@ -29,9 +29,12 @@ The `fob-gui.exe` is an optional companion application that launches automatical
 - **Command execution**: Click any available tpp-mod command from the list with descriptions
 - **Console log viewer**: Real-time display of tpp-mod console logs with auto-scroll
 - **List type conversion**: Popup dialog to convert FOB list types (PICKUP -> FOLLOW, etc.)
+- **Quick Settings**: Preset parameter groups (Console/Network/UI/Performance/Controls/Other) with one-click apply for individual settings, groups, or all at once
 - **Cached players browser**: View all cached player info (name, Steam name, Steam ID, Player ID) with copy buttons
 - **Custom targets browser**: View all custom FOB targets with copy buttons
 - **Dynamic scaling**: Adjustable UI scale input box (0.5 - 5.0) for font and button sizes
+- **Window config persistence**: Window position, size, and font scale are automatically saved on exit and restored on next launch
+- **Resizable dialogs**: All popup dialogs support free-form resizing by dragging edges
 - **Variables browser**: Categorized view of all tpp-mod variables with current values, descriptions, and quick-set buttons
 - **Maximize button**: Standard Windows maximize/restore button for switching between windowed and fullscreen
 

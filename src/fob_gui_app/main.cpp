@@ -18,6 +18,8 @@
 #include <sstream>
 #include <set>
 #include <unordered_map>
+#include <fstream>
+#include <filesystem>
 
 #pragma comment(lib, "d3d11.lib")
 #pragma comment(lib, "user32.lib")
@@ -41,6 +43,56 @@ namespace fob_gui
 
 	float scale_factor = 1.8f;
 	char scale_input[8] = "1.8";
+
+	struct WindowConfig
+	{
+		int x = 100;
+		int y = 100;
+		int w = 990;
+		int h = 765;
+		float font_scale = 1.8f;
+	};
+
+	WindowConfig g_window_config;
+	std::mutex config_mutex;
+
+	std::filesystem::path get_config_path()
+	{
+		wchar_t exe_path[MAX_PATH];
+		GetModuleFileNameW(nullptr, exe_path, MAX_PATH);
+		auto p = std::filesystem::path(exe_path);
+		return p.replace_extension("cfg");
+	}
+
+	void save_config()
+	{
+		std::lock_guard<std::mutex> lock(config_mutex);
+		auto cfg_path = get_config_path();
+		std::ofstream ofs(cfg_path);
+		if (!ofs) return;
+		ofs << g_window_config.x << "\n"
+			<< g_window_config.y << "\n"
+			<< g_window_config.w << "\n"
+			<< g_window_config.h << "\n"
+			<< g_window_config.font_scale << "\n";
+	}
+
+	void load_config()
+	{
+		std::lock_guard<std::mutex> lock(config_mutex);
+		auto cfg_path = get_config_path();
+		std::ifstream ifs(cfg_path);
+		if (!ifs) return;
+		ifs >> g_window_config.x
+			>> g_window_config.y
+			>> g_window_config.w
+			>> g_window_config.h
+			>> g_window_config.font_scale;
+		if (g_window_config.font_scale < 0.5f) g_window_config.font_scale = 0.5f;
+		if (g_window_config.font_scale > 5.0f) g_window_config.font_scale = 5.0f;
+		if (g_window_config.w < 200) g_window_config.w = 200;
+		if (g_window_config.h < 200) g_window_config.h = 200;
+	}
 
 	float btn_w() { return 120.0f * scale_factor; }
 	float btn_h() { return 28.0f * scale_factor; }
@@ -143,6 +195,65 @@ namespace fob_gui
 	char var_set_name[128] = "";
 	char var_set_value[128] = "";
 	std::string vars_status_msg;
+
+	struct SettingOption
+	{
+		std::string var;
+		std::string value;
+	};
+
+	struct SettingsGroup
+	{
+		std::string name;
+		std::vector<SettingOption> options;
+	};
+
+	std::vector<SettingsGroup> settings_groups = {
+		{"Console", {
+			{"console_log", "1"},
+			{"con_input_box_color", "0.2 0.2 0.2 0.9"},
+			{"con_input_hint_box_color", "0.3 0.3 0.3 1"},
+			{"con_output_bar_color", "0.5 0.5 0.5 0.6"},
+			{"con_output_slider_color", "0.85 0 0 1"},
+			{"con_output_window_color", "0.25 0.25 0.25 0.85"},
+			{"con_input_dvar_match_color", "1 1 0.8 1"},
+			{"con_input_dvar_value_color", "1 1 0.8 1"},
+			{"con_input_dvar_inactive_value_color", "0.8 0.8 0.8 1"},
+			{"con_input_cmd_match_color", "0.8 0.8 1 1"},
+		}},
+		{"Network", {
+			{"net_custom_server", ""},
+			{"net_udp", "0"},
+			{"net_port", "5377"},
+		}},
+		{"UI", {
+			{"ui_draw_fps", "1"},
+			{"ui_draw_ping", "1"},
+			{"ui_skip_intro", "1"},
+		}},
+		{"Performance", {
+			{"com_worker_count", "4"},
+			{"com_unlock_fps", "0"},
+			{"com_max_fps", "0"},
+		}},
+		{"Controls", {
+			{"sensitivity", "1"},
+			{"camera_fov_scale", "1"},
+			{"camera_first_person_fov_scale", "1"},
+			{"player_ramble_speed_scale", "1.51"},
+			{"player_ramble_speed_patch", "0"},
+		}},
+		{"Other", {
+			{"discord_enable", "1"},
+			{"dsx_enable", "1"},
+			{"lua_logging", "1"},
+			{"lua_dump", "0"},
+			{"net_server_logging", "1"},
+		}},
+	};
+
+	std::atomic<bool> show_settings_dialog{ false };
+	std::string settings_status_msg;
 
 	HANDLE g_pipe_handle = INVALID_HANDLE_VALUE;
 
@@ -636,11 +747,28 @@ namespace fob_gui
 			if (g_pSwapChain && wParam != SIZE_MINIMIZED)
 			{
 				resize_pending.store(true);
+				RECT rc;
+				GetClientRect(hWnd, &rc);
+				g_window_config.w = rc.right - rc.left;
+				g_window_config.h = rc.bottom - rc.top;
 			}
 			return 0;
+		case WM_MOVE:
+		{
+			RECT rc;
+			GetWindowRect(hWnd, &rc);
+			g_window_config.x = rc.left;
+			g_window_config.y = rc.top;
+		}
+		return 0;
 		case WM_DESTROY:
+			save_config();
 			should_exit.store(true);
 			PostQuitMessage(0);
+			return 0;
+		case WM_CLOSE:
+			save_config();
+			DestroyWindow(hWnd);
 			return 0;
 		default:
 			return DefWindowProc(hWnd, msg, wParam, lParam);
@@ -817,8 +945,9 @@ namespace fob_gui
 		ImGui::OpenPopup("Convert List Type");
 		ImVec2 center = ImGui::GetMainViewport()->GetCenter();
 		ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+		ImGui::SetNextWindowSize(ImVec2(popup_w(), popup_h() * 0.45f), ImGuiCond_Appearing);
 
-		if (ImGui::BeginPopupModal("Convert List Type", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+		if (ImGui::BeginPopupModal("Convert List Type", nullptr, ImGuiWindowFlags_None))
 		{
 			ImGui::Text("Select source and target list types:");
 			ImGui::Separator();
@@ -912,7 +1041,7 @@ namespace fob_gui
 		ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
 		ImGui::SetNextWindowSize(ImVec2(popup_w(), popup_h()), ImGuiCond_Appearing);
 
-		if (ImGui::BeginPopupModal("Cached Players", nullptr, ImGuiWindowFlags_NoResize))
+		if (ImGui::BeginPopupModal("Cached Players", nullptr, ImGuiWindowFlags_None))
 		{
 			if (cached_players.empty())
 			{
@@ -1001,7 +1130,7 @@ namespace fob_gui
 		ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
 		ImGui::SetNextWindowSize(ImVec2(popup_w(), popup_h()), ImGuiCond_Appearing);
 
-		if (ImGui::BeginPopupModal("FOB Target List", nullptr, ImGuiWindowFlags_NoResize))
+		if (ImGui::BeginPopupModal("FOB Target List", nullptr, ImGuiWindowFlags_None))
 		{
 			if (fob_targets.empty())
 			{
@@ -1088,7 +1217,7 @@ namespace fob_gui
 		ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
 		ImGui::SetNextWindowSize(ImVec2(popup_w() + 100, popup_h() + 60), ImGuiCond_Appearing);
 
-		if (ImGui::BeginPopupModal("Variables", nullptr, ImGuiWindowFlags_NoResize))
+		if (ImGui::BeginPopupModal("Variables", nullptr, ImGuiWindowFlags_None))
 		{
 			if (ImGui::Button("Refresh", ImVec2(btn_w(), btn_h())))
 			{
@@ -1228,12 +1357,111 @@ namespace fob_gui
 		}
 	}
 
+	void render_settings_dialog()
+	{
+		if (!show_settings_dialog.load())
+			return;
+
+		ImGui::OpenPopup("Quick Settings");
+		ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+		ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+		ImGui::SetNextWindowSize(ImVec2(popup_w(), popup_h() + 60), ImGuiCond_Appearing);
+
+		if (ImGui::BeginPopupModal("Quick Settings", nullptr, ImGuiWindowFlags_None))
+		{
+			if (ImGui::Button("Apply ALL settings", ImVec2(btn_w() * 1.5f, btn_h())))
+			{
+				int count = 0;
+				for (const auto& group : settings_groups)
+				{
+					for (const auto& opt : group.options)
+					{
+						std::string cmd = "set " + opt.var + " \"" + opt.value + "\"";
+						execute_tpp_command(cmd);
+						count++;
+					}
+				}
+				char buf[64];
+				snprintf(buf, sizeof(buf), "Applied all %d settings", count);
+				settings_status_msg = buf;
+			}
+			if (ImGui::IsItemHovered())
+				ImGui::SetTooltip("Apply every setting from all groups at once");
+
+			ImGui::Separator();
+
+			float child_h = ImGui::GetContentRegionAvail().y - 60 * scale_factor;
+			if (ImGui::BeginChild("##settings_list", ImVec2(0, child_h), true))
+			{
+				for (const auto& group : settings_groups)
+				{
+					if (ImGui::CollapsingHeader(group.name.c_str(), ImGuiTreeNodeFlags_DefaultOpen))
+					{
+						ImGui::SameLine();
+						char apply_group_btn[64];
+						snprintf(apply_group_btn, sizeof(apply_group_btn), "Apply %s##g", group.name.c_str());
+						if (ImGui::SmallButton(apply_group_btn))
+						{
+							int count = 0;
+							for (const auto& opt : group.options)
+							{
+								std::string cmd = "set " + opt.var + " \"" + opt.value + "\"";
+								execute_tpp_command(cmd);
+								count++;
+							}
+							char buf[64];
+							snprintf(buf, sizeof(buf), "Applied %s (%d settings)", group.name.c_str(), count);
+							settings_status_msg = buf;
+						}
+
+						for (const auto& opt : group.options)
+						{
+							ImGui::PushID((opt.var + opt.value).c_str());
+							ImGui::Text("set %s", opt.var.c_str());
+							ImGui::SameLine();
+							ImGui::TextDisabled(" \"%s\"", opt.value.c_str());
+							ImGui::SameLine();
+							char apply_btn[64];
+							snprintf(apply_btn, sizeof(apply_btn), "Apply##s");
+							if (ImGui::SmallButton(apply_btn))
+							{
+								std::string cmd = "set " + opt.var + " \"" + opt.value + "\"";
+								execute_tpp_command(cmd);
+								settings_status_msg = "Sent: " + cmd;
+							}
+							ImGui::PopID();
+						}
+					}
+				}
+			}
+			ImGui::EndChild();
+
+			if (!settings_status_msg.empty())
+			{
+				ImGui::TextDisabled("%s", settings_status_msg.c_str());
+			}
+
+			ImGui::Separator();
+			if (ImGui::Button("Close", ImVec2(btn_w(), btn_h())))
+			{
+				show_settings_dialog.store(false);
+				settings_status_msg.clear();
+				ImGui::CloseCurrentPopup();
+			}
+			if (ImGui::IsItemHovered())
+				ImGui::SetTooltip("Close the quick settings dialog");
+
+			ImGui::EndPopup();
+		}
+	}
+
 	void render_gui()
 	{
 		render_convert_dialog();
 		render_cache_dialog();
 		render_targets_dialog();
 		render_vars_dialog();
+		render_settings_dialog();
 
 		ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
 		ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize, ImGuiCond_Always);
@@ -1272,11 +1500,13 @@ namespace fob_gui
 				if (new_scale < 0.5f) new_scale = 0.5f;
 				if (new_scale > 5.0f) new_scale = 5.0f;
 				scale_factor = new_scale;
+				g_window_config.font_scale = new_scale;
 				snprintf(scale_input, sizeof(scale_input), "%.1f", scale_factor);
 				ImGui::GetIO().FontGlobalScale = scale_factor;
 				ImGui::GetIO().Fonts->Build();
 				ImGui_ImplDX11_InvalidateDeviceObjects();
 				ImGui_ImplDX11_CreateDeviceObjects();
+				save_config();
 			}
 			if (ImGui::IsItemHovered())
 				ImGui::SetTooltip("Apply UI scale factor (0.5 - 5.0)");
@@ -1359,6 +1589,14 @@ namespace fob_gui
 			}
 			if (ImGui::IsItemHovered())
 				ImGui::SetTooltip("Reload player_id and session status from the DLL");
+
+			ImGui::SameLine();
+			if (ImGui::Button("Quick Settings"))
+			{
+				show_settings_dialog.store(true);
+			}
+			if (ImGui::IsItemHovered())
+				ImGui::SetTooltip("Open the quick settings dialog to apply preset parameters");
 
 			ImGui::Separator();
 			ImGui::Text("=== Commands ===");
@@ -1497,13 +1735,18 @@ namespace fob_gui
 
 	int run()
 	{
+		load_config();
+		scale_factor = g_window_config.font_scale;
+		snprintf(scale_input, sizeof(scale_input), "%.1f", scale_factor);
+
 		WNDCLASSEXA wc = { sizeof(WNDCLASSEXA), CS_CLASSDC, WndProc, 0L, 0L,
 			GetModuleHandle(nullptr), nullptr, nullptr, nullptr, nullptr,
 			"FOBGuiWndClass", nullptr };
 		RegisterClassExA(&wc);
 		g_hwnd = CreateWindowExA(0, wc.lpszClassName, "TPP-Mod Control",
 			WS_OVERLAPPEDWINDOW,
-			100, 100, (int)(550 * scale_factor), (int)(425 * scale_factor), nullptr, nullptr, wc.hInstance, nullptr);
+			g_window_config.x, g_window_config.y,
+			g_window_config.w, g_window_config.h, nullptr, nullptr, wc.hInstance, nullptr);
 
 		create_d3d_device();
 
