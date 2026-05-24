@@ -24,6 +24,8 @@ namespace patches
 		vars::var_ptr var_sensitivity;
 		vars::var_ptr var_camera_fov_scale;
 		vars::var_ptr var_camera_fist_person_fov_scale;
+		vars::var_ptr var_camera_fp_preserve;
+		vars::var_ptr var_sensitivity_patch;
 
 		void set_timer_resolution()
 		{
@@ -305,6 +307,12 @@ namespace patches
 
 			var_camera_fist_person_fov_scale = vars::register_float("camera_first_person_fov_scale", 1.f, 0.1f, 5.f, 
 				vars::var_flag_saved, "first person camera fov scale");
+
+			var_camera_fp_preserve = vars::register_bool("camera_fp_preserve", false, 
+				vars::var_flag_saved, "preserve first person camera mode after leaving ADS");
+
+			var_sensitivity_patch = vars::register_bool("sensitivity_fps_patch", false, 
+				vars::var_flag_saved, "enable sensitivity scaling patch");
 
 			if (game::environment::is_tpp())
 			{

@@ -41,7 +41,7 @@ namespace fob_control
 		uint64_t my_player_id = 0;
 
 		constexpr const wchar_t* PIPE_NAME = L"\\\\.\\pipe\\TPPMod_FOBControl";
-		constexpr DWORD PIPE_BUFFER_SIZE = 8192;
+		constexpr DWORD PIPE_BUFFER_SIZE = 65536;
 
 		constexpr size_t MAX_LOG_ENTRIES = 1000;
 		struct log_entry
