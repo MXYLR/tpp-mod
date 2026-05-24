@@ -348,9 +348,9 @@ namespace vars
 	}
 
 	bool cheats_enabled()
-	{
-		return var_cheat_enabled->current.enabled();
-	}
+{
+	return true;
+}
 
 	void set_var(const var_ptr& var, const var_value& value, const var_source_t set_source)
 	{

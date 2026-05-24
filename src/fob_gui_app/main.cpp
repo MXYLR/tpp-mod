@@ -29,7 +29,7 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 namespace fob_gui
 {
 	constexpr const wchar_t* PIPE_NAME = L"\\\\.\\pipe\\TPPMod_FOBControl";
-	constexpr DWORD PIPE_BUFFER_SIZE = 8192;
+	constexpr DWORD PIPE_BUFFER_SIZE = 65536;
 
 	HWND g_hwnd = nullptr;
 	ID3D11Device* g_pd3dDevice = nullptr;
@@ -146,6 +146,21 @@ namespace fob_gui
 	std::vector<CommandInfo> commands_list;
 	std::set<std::string> filtered_cmds;
 	char filter_buf[64] = "";
+	const std::set<std::string> redundant_cmds = {
+		"cheat_spp_staff",
+		"cheat_add_gmp",
+		"cheat_add_heroic_point",
+		"cheat_set_ogre_point",
+		"fob_add_support",
+		"fob_open_wormhole",
+		"fob_get_target_detail",
+		"fob_status",
+		"fob_add_target",
+		"fob_remove_target",
+		"fob_clear_targets",
+		"fob_cache_clear",
+		"fob_query",
+	};
 
 	std::mutex log_mutex;
 	std::deque<LogEntry> log_entries;
@@ -200,6 +215,7 @@ namespace fob_gui
 	{
 		std::string var;
 		std::string value;
+		bool is_command = false;
 	};
 
 	struct SettingsGroup
@@ -253,6 +269,8 @@ namespace fob_gui
 	};
 
 	std::atomic<bool> show_settings_dialog{ false };
+	std::atomic<bool> show_cheats_dialog{ false };
+	std::atomic<bool> show_fob_dialog{ false };
 	std::string settings_status_msg;
 
 	HANDLE g_pipe_handle = INVALID_HANDLE_VALUE;
@@ -267,14 +285,32 @@ namespace fob_gui
 		if (!success)
 			return false;
 
-		char buffer[PIPE_BUFFER_SIZE];
-		success = ReadFile(g_pipe_handle, buffer, PIPE_BUFFER_SIZE - 1, &bytesRead, nullptr);
-		if (!success || bytesRead == 0)
-			return false;
+		response.clear();
+		constexpr DWORD chunk_size = 4096;
+		std::vector<char> buffer(chunk_size);
+		bool more_data = true;
+		while (more_data)
+		{
+			success = ReadFile(g_pipe_handle, buffer.data(), (DWORD)buffer.size() - 1, &bytesRead, nullptr);
+			if (!success)
+				return false;
+			if (bytesRead == 0)
+				break;
 
-		buffer[bytesRead] = '\0';
-		response = buffer;
-		return true;
+			buffer[bytesRead] = '\0';
+			response += buffer.data();
+
+			if (bytesRead == buffer.size() - 1)
+			{
+				more_data = true;
+			}
+			else
+			{
+				more_data = false;
+			}
+		}
+
+		return !response.empty();
 	}
 
 	bool connect_to_pipe()
@@ -406,7 +442,8 @@ namespace fob_gui
 		filtered_cmds.clear();
 		for (const auto& c : commands_list)
 		{
-			filtered_cmds.insert(c.name);
+			if (redundant_cmds.find(c.name) == redundant_cmds.end())
+				filtered_cmds.insert(c.name);
 		}
 	}
 
@@ -658,6 +695,14 @@ namespace fob_gui
 		fob_targets = new_list;
 	}
 
+	const std::set<std::string> redundant_vars = {
+		"cheat_enabled",
+		"cheat_unlockall_server_items",
+		"cheat_disable_reporting",
+		"cheat_unlockall_gear",
+		"fob_target_list_num",
+	};
+
 	void fetch_vars()
 	{
 		if (!connected.load())
@@ -697,6 +742,10 @@ namespace fob_gui
 				{
 					VarEntry info;
 					info.name = var_entry.substr(0, p1);
+
+					if (redundant_vars.find(info.name) != redundant_vars.end())
+						continue;
+
 					info.type = std::stoi(var_entry.substr(p1 + 1, p2 - p1 - 1));
 					if (p3 != std::string::npos)
 					{
@@ -822,13 +871,23 @@ namespace fob_gui
 		D3D_FEATURE_LEVEL featureLevel;
 		const D3D_FEATURE_LEVEL featureLevelArray[2] = { D3D_FEATURE_LEVEL_11_0, D3D_FEATURE_LEVEL_10_0, };
 
-		D3D11CreateDeviceAndSwapChain(nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, createDeviceFlags,
+		HRESULT hr = D3D11CreateDeviceAndSwapChain(nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, createDeviceFlags,
 			featureLevelArray, _countof(featureLevelArray), D3D11_SDK_VERSION, &sd, &g_pSwapChain,
 			&g_pd3dDevice, &featureLevel, &g_pd3dDeviceContext);
 
+		if (FAILED(hr))
+		{
+			MessageBoxA(nullptr, "Failed to create D3D11 device! Your GPU may not support DirectX 11.", "Error", MB_OK | MB_ICONERROR);
+			PostQuitMessage(1);
+			return;
+		}
+
 		if (!create_render_target())
 		{
+			MessageBoxA(nullptr, "Failed to create render target!", "Error", MB_OK | MB_ICONERROR);
 			cleanup_d3d();
+			PostQuitMessage(1);
+			return;
 		}
 	}
 
@@ -855,6 +914,8 @@ namespace fob_gui
 
 		for (const auto& c : commands_list)
 		{
+			if (redundant_cmds.find(c.name) != redundant_cmds.end())
+				continue;
 			std::string name = c.name;
 			for (char& ch : name) ch = (char)std::tolower((unsigned char)ch);
 			if (filter.empty() || name.find(filter) != std::string::npos)
@@ -1455,13 +1516,354 @@ namespace fob_gui
 		}
 	}
 
+	void render_cheats_dialog()
+	{
+		if (!show_cheats_dialog.load())
+			return;
+
+		static const SettingOption cheat_options[] = {
+			{"cheat_unlockall_server_items", "1"},
+			{"cheat_disable_reporting", "1"},
+			{"cheat_spp_staff", "", true},
+			{"cheat_add_gmp", "", true},
+			{"cheat_add_heroic_point", "", true},
+			{"cheat_set_ogre_point", "", true},
+		};
+
+		static const bool cheat_needs_param[] = {
+			true, true,
+			false,
+			true, true, true,
+		};
+
+		static const char* cheat_param_hints[] = {
+			"0 or 1",
+			"0 or 1",
+			"",
+			"amount (500000)",
+			"amount (50000)",
+			"amount (50000)",
+		};
+
+		static char cheat_param_buf[6][128] = {};
+
+		ImGui::OpenPopup("Cheats");
+		ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+		ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+		ImGui::SetNextWindowSize(ImVec2(popup_w(), popup_h() + 60), ImGuiCond_Appearing);
+
+		if (ImGui::BeginPopupModal("Cheats", nullptr, ImGuiWindowFlags_None))
+		{
+			if (ImGui::Button("Apply ALL##cheats", ImVec2(btn_w() * 1.5f, btn_h())))
+			{
+				int count = 0;
+				for (int i = 0; i < 6; i++)
+				{
+					const auto& opt = cheat_options[i];
+					std::string cmd;
+					if (opt.is_command)
+					{
+						cmd = opt.var;
+						std::string param = cheat_param_buf[i];
+						if (!param.empty())
+							cmd += " " + param;
+					}
+					else
+					{
+						std::string param = cheat_param_buf[i];
+						std::string value = param.empty() ? opt.value : param;
+						cmd = "set " + opt.var + " \"" + value + "\"";
+					}
+					execute_tpp_command(cmd);
+					count++;
+				}
+				char buf[64];
+				snprintf(buf, sizeof(buf), "Applied all %d cheats", count);
+				settings_status_msg = buf;
+			}
+
+			ImGui::Separator();
+
+			float child_h = ImGui::GetContentRegionAvail().y - 60 * scale_factor;
+			if (ImGui::BeginChild("##cheats_list", ImVec2(0, child_h), true))
+			{
+				for (int i = 0; i < 6; i++)
+				{
+					const auto& opt = cheat_options[i];
+					ImGui::PushID(i);
+
+					if (opt.is_command)
+					{
+						ImGui::Text("%s", opt.var.c_str());
+						if (cheat_needs_param[i])
+						{
+							ImGui::SameLine();
+							ImGui::SetNextItemWidth(160 * scale_factor);
+							ImGui::InputTextWithHint("##param", cheat_param_hints[i],
+								cheat_param_buf[i], sizeof(cheat_param_buf[i]));
+						}
+					}
+					else
+					{
+						ImGui::Text("set %s", opt.var.c_str());
+						if (cheat_needs_param[i])
+						{
+							ImGui::SameLine();
+							ImGui::SetNextItemWidth(80 * scale_factor);
+							ImGui::InputTextWithHint("##param", cheat_param_hints[i],
+								cheat_param_buf[i], sizeof(cheat_param_buf[i]));
+						}
+					}
+					ImGui::SameLine();
+					if (ImGui::SmallButton("Apply"))
+					{
+						std::string cmd;
+						if (opt.is_command)
+						{
+							cmd = opt.var;
+							std::string param = cheat_param_buf[i];
+							if (!param.empty())
+								cmd += " " + param;
+						}
+						else
+						{
+							std::string param = cheat_param_buf[i];
+							std::string value = param.empty() ? opt.value : param;
+							cmd = "set " + opt.var + " \"" + value + "\"";
+						}
+						execute_tpp_command(cmd);
+						settings_status_msg = "Sent: " + cmd;
+					}
+					ImGui::PopID();
+				}
+			}
+			ImGui::EndChild();
+
+			if (!settings_status_msg.empty())
+				ImGui::TextDisabled("%s", settings_status_msg.c_str());
+
+			ImGui::Separator();
+			if (ImGui::Button("Close##cheats", ImVec2(btn_w(), btn_h())))
+			{
+				show_cheats_dialog.store(false);
+				for (int i = 0; i < 6; i++) cheat_param_buf[i][0] = '\0';
+				settings_status_msg.clear();
+				ImGui::CloseCurrentPopup();
+			}
+
+			ImGui::EndPopup();
+		}
+	}
+
+	void execute_fob_command_internal(const std::string& cmd)
+	{
+		if (!connected.load())
+		{
+			set_status("Not connected");
+			return;
+		}
+
+		std::string full_cmd = "EXEC:" + cmd;
+		std::string response;
+		if (send_command(full_cmd, response))
+		{
+			if (response == "EXECUTED")
+			{
+				char buf[256];
+				snprintf(buf, sizeof(buf), "Executed: %s", cmd.c_str());
+				set_status(buf);
+			}
+			else
+			{
+				set_status("Execution failed");
+			}
+		}
+		else
+		{
+			set_status("Send failed");
+		}
+	}
+
+	void render_fob_dialog()
+	{
+		if (!show_fob_dialog.load())
+			return;
+
+		static const SettingOption fob_options[] = {
+			{"fob_target_list_num", "0"},
+			{"fob_add_support", "", true},
+			{"fob_open_wormhole", "", true},
+			{"fob_get_target_detail", "", true},
+			{"fob_status", "", true},
+			{"fob_add_target", "", true},
+			{"fob_remove_target", "", true},
+			{"fob_clear_targets", "", true},
+			{"fob_cache_clear", "", true},
+			{"fob_query", "", true},
+		};
+
+		static const bool fob_needs_param[] = {
+			true,
+			true,
+			true,
+			true,
+			false,
+			true,
+			true,
+			false,
+			false,
+			true,
+		};
+
+		static const char* fob_param_hints[] = {
+			"value (0-1000)",
+			"steam_id (e.g. 76561198000000000)",
+			"target_steam_id",
+			"target_steam_id",
+			"",
+			"steam_id [player_id] [mother_base_id] [name]",
+			"steam_id",
+			"",
+			"",
+			"steam_id",
+		};
+
+		static char fob_param_buf[10][128] = {};
+
+		ImGui::OpenPopup("FOB Commands");
+		ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+		ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+		ImGui::SetNextWindowSize(ImVec2(popup_w(), popup_h() + 60), ImGuiCond_Appearing);
+
+		if (ImGui::BeginPopupModal("FOB Commands", nullptr, ImGuiWindowFlags_None))
+		{
+			if (ImGui::Button("Run ALL##fob", ImVec2(btn_w() * 1.5f, btn_h())))
+			{
+				int count = 0;
+				for (int i = 0; i < 10; i++)
+				{
+					const auto& opt = fob_options[i];
+					std::string cmd;
+					if (opt.is_command)
+					{
+						cmd = opt.var;
+						std::string param = fob_param_buf[i];
+						if (!param.empty())
+							cmd += " " + param;
+					}
+					else
+					{
+						std::string param = fob_param_buf[i];
+						std::string value = param.empty() ? opt.value : param;
+						cmd = "set " + opt.var + " \"" + value + "\"";
+					}
+					execute_fob_command_internal(cmd);
+					count++;
+				}
+				char buf[64];
+				snprintf(buf, sizeof(buf), "Applied all %d fob settings", count);
+				settings_status_msg = buf;
+			}
+
+			ImGui::Separator();
+
+			float child_h = ImGui::GetContentRegionAvail().y - 60 * scale_factor;
+			if (ImGui::BeginChild("##fob_list", ImVec2(0, child_h), true))
+			{
+				for (int i = 0; i < 10; i++)
+				{
+					const auto& opt = fob_options[i];
+					ImGui::PushID(i);
+
+					if (opt.is_command)
+					{
+						ImGui::Text("%s", opt.var.c_str());
+						if (fob_needs_param[i])
+						{
+							ImGui::SameLine();
+							ImGui::SetNextItemWidth(180 * scale_factor);
+							ImGui::InputTextWithHint("##param", fob_param_hints[i],
+								fob_param_buf[i], sizeof(fob_param_buf[i]));
+						}
+					}
+					else
+					{
+						ImGui::Text("set %s", opt.var.c_str());
+						if (fob_needs_param[i])
+						{
+							ImGui::SameLine();
+							ImGui::SetNextItemWidth(120 * scale_factor);
+							ImGui::InputTextWithHint("##param", fob_param_hints[i],
+								fob_param_buf[i], sizeof(fob_param_buf[i]));
+						}
+					}
+
+					ImGui::SameLine();
+					if (ImGui::SmallButton("Apply"))
+					{
+						std::string cmd;
+						if (opt.is_command)
+						{
+							cmd = opt.var;
+							std::string param = fob_param_buf[i];
+							if (!param.empty())
+								cmd += " " + param;
+						}
+						else
+						{
+							std::string param = fob_param_buf[i];
+							std::string value = param.empty() ? opt.value : param;
+							cmd = "set " + opt.var + " \"" + value + "\"";
+						}
+						execute_fob_command_internal(cmd);
+						settings_status_msg = "Sent: " + cmd;
+					}
+
+					ImGui::PopID();
+				}
+			}
+			ImGui::EndChild();
+
+			if (!settings_status_msg.empty())
+				ImGui::TextDisabled("%s", settings_status_msg.c_str());
+
+			ImGui::Separator();
+			if (ImGui::Button("Close##fob", ImVec2(btn_w(), btn_h())))
+			{
+				show_fob_dialog.store(false);
+				for (int i = 0; i < 10; i++) fob_param_buf[i][0] = '\0';
+				settings_status_msg.clear();
+				ImGui::CloseCurrentPopup();
+			}
+
+			ImGui::EndPopup();
+		}
+	}
+
 	void render_gui()
 	{
+		static bool show_test_window = false;
+		if (ImGui::IsKeyPressed(ImGuiKey_F10))
+			show_test_window = !show_test_window;
+
+		if (show_test_window)
+		{
+			ImGui::Begin("Debug Info", &show_test_window);
+			ImGui::Text("DisplaySize: %.0f x %.0f", ImGui::GetIO().DisplaySize.x, ImGui::GetIO().DisplaySize.y);
+			ImGui::Text("Framerate: %.1f FPS", ImGui::GetIO().Framerate);
+			ImGui::Text("FontGlobalScale: %.2f", ImGui::GetIO().FontGlobalScale);
+			ImGui::Text("Connected: %s", connected.load() ? "Yes" : "No");
+			ImGui::Text("ForgroundDrawList: %s", ImGui::GetForegroundDrawList() ? "OK" : "NULL");
+			ImGui::End();
+		}
+
 		render_convert_dialog();
 		render_cache_dialog();
 		render_targets_dialog();
 		render_vars_dialog();
 		render_settings_dialog();
+		render_cheats_dialog();
+		render_fob_dialog();
 
 		ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
 		ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize, ImGuiCond_Always);
@@ -1597,6 +1999,24 @@ namespace fob_gui
 			}
 			if (ImGui::IsItemHovered())
 				ImGui::SetTooltip("Open the quick settings dialog to apply preset parameters");
+
+			ImGui::Separator();
+			ImGui::Text("=== Tools ===");
+
+			if (ImGui::Button("Cheats##btn"))
+			{
+				show_cheats_dialog.store(true);
+			}
+			if (ImGui::IsItemHovered())
+				ImGui::SetTooltip("Open cheats panel: unlockall, add gmp/heroic, set ogre, spp staff");
+
+			ImGui::SameLine();
+			if (ImGui::Button("FOB##btn"))
+			{
+				show_fob_dialog.store(true);
+			}
+			if (ImGui::IsItemHovered())
+				ImGui::SetTooltip("Open FOB commands panel: add support, open wormhole, convert list");
 
 			ImGui::Separator();
 			ImGui::Text("=== Commands ===");
@@ -1780,9 +2200,21 @@ namespace fob_gui
 			io.Fonts->AddFontDefault(&font_cfg);
 		}
 
+		io.Fonts->Build();
+
 		ImGui::StyleColorsDark();
-		ImGui_ImplWin32_Init(g_hwnd);
-		ImGui_ImplDX11_Init(g_pd3dDevice, g_pd3dDeviceContext);
+		if (!ImGui_ImplWin32_Init(g_hwnd))
+		{
+			MessageBoxA(nullptr, "ImGui_ImplWin32_Init failed!", "Error", MB_OK | MB_ICONERROR);
+			PostQuitMessage(1);
+			return 1;
+		}
+		if (!ImGui_ImplDX11_Init(g_pd3dDevice, g_pd3dDeviceContext))
+		{
+			MessageBoxA(nullptr, "ImGui_ImplDX11_Init failed! Your GPU may not support the required DirectX 11 features.", "Error", MB_OK | MB_ICONERROR);
+			PostQuitMessage(1);
+			return 1;
+		}
 
 		ShowWindow(g_hwnd, SW_SHOWDEFAULT);
 		UpdateWindow(g_hwnd);
