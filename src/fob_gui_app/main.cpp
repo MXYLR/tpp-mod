@@ -1943,48 +1943,7 @@ namespace fob_gui
 			}
 
 			ImGui::Separator();
-			ImGui::Text("=== FOB Wormhole ===");
 
-			ImGui::Text("Target SteamID:");
-			if (ImGui::InputText("##target_steam", target_steam_buf, sizeof(target_steam_buf), ImGuiInputTextFlags_CharsDecimal))
-			{
-				if (connected.load())
-				{
-					std::string cmd = "SET_TARGET_STEAMID:" + std::string(target_steam_buf);
-					std::string response;
-					if (send_command(cmd, response))
-					{
-						if (response == "OK")
-						{
-							set_status("SteamID resolved");
-						}
-						else if (response == "NOT_CACHED")
-						{
-							set_status("SteamID not cached");
-						}
-						else
-						{
-							set_status("Invalid SteamID");
-						}
-					}
-				}
-			}
-
-			if (ImGui::Button("Open wormhole"))
-			{
-				if (connected.load())
-				{
-					std::string response;
-					if (send_command("OPEN_WORMHOLE", response))
-					{
-						set_status(response == "OK" ? "Wormhole opened!" : "Failed");
-					}
-				}
-			}
-			if (ImGui::IsItemHovered())
-				ImGui::SetTooltip("Send CMD_OPEN_WORMHOLE to the server for the target SteamID");
-
-			ImGui::SameLine();
 			if (ImGui::Button("Refresh info"))
 			{
 				update_info();
