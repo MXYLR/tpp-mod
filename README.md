@@ -2,8 +2,7 @@
 
 Improvements and fixes for Metal Gear Solid V: The Phantom Pain
 
-discord server
-https://discord.gg/hYfW9MEEGF
+bilibili:https://space.bilibili.com/27683704
 
 ## Installation
 
