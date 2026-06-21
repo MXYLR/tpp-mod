@@ -402,13 +402,9 @@ namespace session
 			command::add("status", []
 			{
 				scheduler::once(print_status, scheduler::session);
-			},
-			"Print current session status information",
-			"status");
+			});
 
-			command::add("rtt", print_rtt,
-				"Print current round-trip time to session host",
-				"rtt");
+			command::add("rtt", print_rtt);
 
 			if (game::environment::is_tpp())
 			{
@@ -416,9 +412,7 @@ namespace session
 				{
 					const auto fob_target = game::tpp::net::ServerManager_::GetFobTarget(*game::tpp::net::ServerManager_::s_instance);
 					game::tpp::net::FobTarget_::CreateHostSession(fob_target);
-				},
-				"Create a host session for FOB infiltration",
-				"session_create");
+				});
 
 				command::add("session_start", []()
 				{
@@ -429,9 +423,7 @@ namespace session
 					}
 
 					session->started = 1;
-				},
-				"Start the FOB infiltration session",
-				"session_start");
+				});
 
 				command::add("session_accept", []()
 				{
@@ -442,16 +434,12 @@ namespace session
 					}
 
 					session->acceptEnabled = 1;
-				},
-				"Accept incoming session connections",
-				"session_accept");
+				});
 
 				command::add("session_close", [](const command::params& params)
 				{
 					utils::hook::invoke<void>(SELECT_VALUE_LANG(0x146457B20, 0x148087770));
-				},
-				"Close the current FOB infiltration session",
-				"session_close");
+				});
 
 				command::add("session_connect", [](const command::params& params)
 				{
@@ -466,9 +454,7 @@ namespace session
 					fob_target->sessionConnectInfo->hostParam = steam_id;
 					fob_target->sessionConnectInfo->a1 = 0;
 					game::tpp::net::FobTarget_::CreateClientSession(fob_target, fob_target->sessionConnectInfo);
-				},
-				"Connect to a session host by target Steam ID",
-				"session_connect <steam_id>");
+				});
 			}
 			else
 			{
@@ -515,9 +501,7 @@ namespace session
 						dedicated_server::ban_player_from_session(steam_id);
 						game::fox::nt::Member_::Reset(client);
 					}, scheduler::session);
-				},
-				"Kick a player from the session by name, index, or Steam ID",
-				"kick <name|index|steam_id>");
+				});
 			}
 		}
 	};

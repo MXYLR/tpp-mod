@@ -2,12 +2,9 @@
 
 #include <string>
 #include <tomcrypt.h>
+#include <intrin.h>
 
-#ifdef _WIN32
 #define BSWAP32(x) _byteswap_ulong(x)
-#else
-#define BSWAP32(x) __builtin_bswap32(x)
-#endif
 
 namespace utils::cryptography
 {
@@ -241,6 +238,7 @@ namespace utils::cryptography
 			0x55533a3a, 0x20838d87, 0xfe6ba9b7, 0xd096954b, 0x55a867bc, 0xa1159a58,
 			0xcca92963, 0x99e1db33, 0xa62a4a56, 0x3f3125f9, 0x5ef47e1c, 0x9029317c,
 			0xfdf8e802, 0x04272f70, 0x80bb155c, 0x05282ce3, 0x95c11548, 0xe4c66d22,
+
 			0x48c1133f, 0xc70f86dc, 0x07f9c9ee, 0x41041f0f, 0x404779a4, 0x5d886e17,
 			0x325f51eb, 0xd59bc0d1, 0xf2bcc18f, 0x41113564, 0x257b7834, 0x602a9c60,
 			0xdff8e8a3, 0x1f636c1b, 0x0e12b4c2, 0x02e1329e, 0xaf664fd1, 0xcad18115,

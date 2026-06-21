@@ -111,7 +111,7 @@ namespace fob_gui
 	struct LogEntry
 	{
 		uint64_t id;
-		int type;
+		std::string type;
 		std::string message;
 	};
 
@@ -427,6 +427,12 @@ namespace fob_gui
 				}
 				new_list.push_back(info);
 			}
+			else if (!cmd_entry.empty())
+			{
+				CommandInfo info;
+				info.name = cmd_entry;
+				new_list.push_back(info);
+			}
 		}
 
 		std::lock_guard<std::mutex> lock(data_mutex);
@@ -455,7 +461,7 @@ namespace fob_gui
 		size_t pos = 0;
 		while (pos < data.size())
 		{
-			size_t end_pos = data.find("||", pos);
+			size_t end_pos = data.find("\n", pos);
 			std::string log_entry_str;
 			if (end_pos == std::string::npos)
 			{
@@ -465,7 +471,7 @@ namespace fob_gui
 			else
 			{
 				log_entry_str = data.substr(pos, end_pos - pos);
-				pos = end_pos + 2;
+				pos = end_pos + 1;
 			}
 
 			size_t p1 = log_entry_str.find("|");
@@ -476,7 +482,7 @@ namespace fob_gui
 				{
 					LogEntry entry;
 					entry.id = std::stoull(log_entry_str.substr(0, p1));
-					entry.type = std::stoi(log_entry_str.substr(p1 + 1, p2 - p1 - 1));
+					entry.type = log_entry_str.substr(p1 + 1, p2 - p1 - 1);
 					entry.message = log_entry_str.substr(p2 + 1);
 					log_entries.push_back(entry);
 					if (entry.id > last_log_id)
@@ -2083,21 +2089,16 @@ namespace fob_gui
 				for (const auto& entry : log_entries)
 				{
 					ImVec4 color;
-					switch (entry.type)
-					{
-					case 1: // error
-						color = ImVec4(1.0f, 0.3f, 0.3f, 1.0f);
-						break;
-					case 2: // debug
-						color = ImVec4(0.3f, 0.8f, 1.0f, 1.0f);
-						break;
-					case 3: // warning
-						color = ImVec4(1.0f, 0.9f, 0.3f, 1.0f);
-						break;
-					default: // info
-						color = ImVec4(0.9f, 0.9f, 0.9f, 1.0f);
-						break;
-					}
+				if (entry.type == "error")
+					color = ImVec4(1.0f, 0.3f, 0.3f, 1.0f);
+				else if (entry.type == "success")
+					color = ImVec4(0.3f, 1.0f, 0.3f, 1.0f);
+				else if (entry.type == "debug")
+					color = ImVec4(0.3f, 0.8f, 1.0f, 1.0f);
+				else if (entry.type == "warning")
+					color = ImVec4(1.0f, 0.9f, 0.3f, 1.0f);
+				else // info
+					color = ImVec4(0.9f, 0.9f, 0.9f, 1.0f);
 					ImGui::PushStyleColor(ImGuiCol_Text, color);
 					ImGui::TextUnformatted(entry.message.c_str());
 					ImGui::PopStyleColor();

@@ -7,7 +7,7 @@ function json.import()
 end
 
 function json.includes()
-    includedirs {path.join(json.source, "single_include/*")}
+    includedirs {path.join(json.source, "single_include/nlohmann")}
 end
 
 function json.project()

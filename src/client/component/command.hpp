@@ -35,10 +35,10 @@ namespace command
 	void run_frame();
 
 	void execute(const std::string& cmd, bool sync = false);
-	void add(const std::string& name, const callback& cb, 
-		const std::string& description = {}, const std::string& usage = {});
+	void add(const std::string& name, const callback& cb,
+		const std::string& description = "", const std::string& usage = "");
 	void add(const std::string& name, const callback_narg& cb,
-		const std::string& description = {}, const std::string& usage = {});
+		const std::string& description = "", const std::string& usage = "");
 
 	std::optional<std::string> find_command_name(const std::string& input);
 

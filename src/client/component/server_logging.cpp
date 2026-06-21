@@ -4,23 +4,17 @@
 #include "game/game.hpp"
 
 #include "custom_server.hpp"
-#include "fob_target.hpp"
 #include "vars.hpp"
 #include "console.hpp"
 #include "command.hpp"
+#include "fob_target.hpp"
 
 #include <utils/hook.hpp>
 #include <utils/io.hpp>
 #include <utils/string.hpp>
 #include <utils/flags.hpp>
-#include <utils/cryptography.hpp>
 #include <utils/http.hpp>
-
-#ifdef _WIN32
-#define BSWAP32(x) _byteswap_ulong(x)
-#else
-#define BSWAP32(x) __builtin_bswap32(x)
-#endif
+#include <utils/cryptography.hpp>
 
 namespace server_logging
 {
@@ -32,17 +26,20 @@ namespace server_logging
 		vars::var_ptr var_server_logging;
 		vars::var_ptr var_net_server_heartbeat;
 
+		// TPP session key (captured from CMD_REQAUTH_HTTPS)
+		std::string tpp_session_key = "";
+		bool tpp_session_key_available = false;
+
+		// FOB list type conversion
+		std::string list_type_convert_from = "";
+		std::string list_type_convert_to = "";
+		bool list_type_convert_enabled = false;
+
+		// FOB add support (CMD_ADD_FOLLOW interceptor)
 		std::uint64_t add_follow_override_steam_id = 0;
 		std::uint64_t add_follow_override_player_id = 0;
 		bool add_follow_override_enabled = false;
 		bool add_follow_override_one_shot = false;
-
-		std::string tpp_session_key = "";
-		bool tpp_session_key_available = false;
-
-		std::string list_type_convert_from = "";
-		std::string list_type_convert_to = "";
-		bool list_type_convert_enabled = false;
 
 		const uint8_t tpp_static_key[16] = {0xD8, 0x89, 0x0A, 0xF0, 0x66, 0xC9, 0x6B, 0x40, 0xD7, 0x01, 0xAE, 0xFC, 0x43, 0x6F, 0xF9, 0xFE};
 
@@ -72,11 +69,6 @@ namespace server_logging
 			bool has_session_key() const
 			{
 				return !session_key_string_.empty();
-			}
-
-			std::string encrypt_with_static(const std::string& data)
-			{
-				return static_blow_.encrypt(data);
 			}
 
 			std::string decrypt_with_static(const std::string& data)
@@ -201,7 +193,8 @@ namespace server_logging
 				{
 					console::info("[TPP Client] Response received!");
 
-					const auto& raw = response.value();
+					const auto& result = response.value();
+					const auto& raw = result.buffer;
 					if (raw.empty())
 					{
 						console::info("[TPP Client] Response body is empty, but request was sent. Treating as success.");
@@ -350,44 +343,6 @@ namespace server_logging
 
 		tpp_client tpp_client_instance_;
 
-		std::uint64_t get_my_steam_id()
-		{
-			try
-			{
-				const auto steam_user = (*game::SteamUser)();
-				if (steam_user != nullptr)
-				{
-					game::steam_id steam_id{};
-					steam_user->__vftable->GetSteamID(steam_user, &steam_id);
-					return steam_id.bits;
-				}
-			}
-			catch (...)
-			{
-			}
-			return 0;
-		}
-
-		std::uint64_t get_my_player_id_from_cache_impl()
-		{
-			try
-			{
-				const auto my_steam_id = get_my_steam_id();
-				if (my_steam_id != 0)
-				{
-					const auto cached_player = fob_target::get_cached_player(my_steam_id);
-					if (cached_player.has_value())
-					{
-						return cached_player->player_id;
-					}
-				}
-			}
-			catch (...)
-			{
-			}
-			return 0;
-		}
-
 		std::string get_dump_path(const std::string cmd_name, const bool request)
 		{
 			static const auto game_name = SELECT_VALUE_NOLANG("tpp", "mgo");
@@ -400,172 +355,123 @@ namespace server_logging
 			return name;
 		}
 
-		std::string get_raw_dump_path(const std::string cmd_name, const bool request)
-		{
-			static const auto game_name = SELECT_VALUE_NOLANG("tpp", "mgo");
-			static const auto folder = custom_server::is_using_custom_server() ? "server_dump/custom" : "server_dump/konami";
-
-			const auto request_folder = request ? "requests_raw" : "responses_raw";
-			const auto name = utils::string::va("tpp-mod/%s/%s/%s/%s/%lli.bin", folder, game_name, request_folder,
-				cmd_name.data(), GetTickCount64());
-
-			return name;
-		}
-
-		std::string get_encrypted_dump_path(const std::string cmd_name, const bool request)
-		{
-			static const auto game_name = SELECT_VALUE_NOLANG("tpp", "mgo");
-			static const auto folder = custom_server::is_using_custom_server() ? "server_dump/custom" : "server_dump/konami";
-
-			const auto request_folder = request ? "requests_encrypted" : "responses_encrypted";
-			const auto name = utils::string::va("tpp-mod/%s/%s/%s/%s/%lli.bin", folder, game_name, request_folder,
-				cmd_name.data(), GetTickCount64());
-
-			return name;
-		}
-
 		std::string get_fox_buffer(game::fox::Buffer* buffer)
 		{
 			const auto buf = game::fox::Buffer_::GetBuffer(buffer);
 			const auto buf_size = game::fox::Buffer_::GetSize(buffer);
-			return std::string{buf, buf + buf_size};
+			const auto data = std::string{buf, buf + buf_size};
+			return data;
 		}
 
-		void* http_codec_end_decode_stub(void* this_, void* ctx, game::fox::Buffer* buffer)
+		bool intercept_list_type_convert(game::fox::Buffer* buffer)
 		{
-			const auto res = http_codec_end_decode_hook.invoke<void*>(this_, ctx, buffer);
-
+			if (!list_type_convert_enabled || buffer == nullptr)
 			{
-				const auto raw_data = get_fox_buffer(buffer);
+				return false;
+			}
 
-				auto json = nlohmann::json::parse(raw_data, nullptr, false);
-				if (!json.is_discarded() && json.is_object())
+			try
+			{
+				const auto buf = game::fox::Buffer_::GetBuffer(buffer);
+				const auto buf_size = game::fox::Buffer_::GetSize(buffer);
+
+				if (buf != nullptr && buf_size > 0)
 				{
-					const auto cmd = json.value("msgid", "unknown");
+					const std::string raw_data{buf, buf + buf_size};
+					auto json = nlohmann::json::parse(raw_data, nullptr, false);
 
-					console::info("[server logging] received response for command \"%s\"", cmd.data());
-
-					if (cmd == "CMD_REQAUTH_HTTPS" || cmd == "CMD_REQAUTH")
+					if (!json.is_discarded() && json.is_object() && json.contains("msgid") &&
+						json["msgid"].is_string() && json["msgid"].get<std::string>() == "CMD_GET_FOB_TARGET_LIST")
 					{
-						if (json.contains("crypto_key") && json["crypto_key"].is_string())
+						if (json.contains("type") && json["type"].is_string())
 						{
-							const auto crypto_key = json["crypto_key"].get<std::string>();
-							tpp_session_key = crypto_key;
-							tpp_session_key_available = true;
-							tpp_client_instance_.set_session_key(crypto_key);
+							const auto current_type = json["type"].get<std::string>();
+							if (current_type == list_type_convert_from)
+							{
+								console::info("[FOB] Converting list type: %s -> %s",
+									list_type_convert_from.c_str(), list_type_convert_to.c_str());
+								json["type"] = list_type_convert_to;
 
-							console::info("[TPP Client] =============================================");
-							console::info("[TPP Client] Session key captured from %s", cmd.data());
-							console::info("[TPP Client] Session key: %s", crypto_key.substr(0, 20).c_str());
-							console::info("[TPP Client] You can now use fob_open_wormhole directly!");
-							console::info("[TPP Client] =============================================");
+								const auto new_data = json.dump(-1);
+								if (new_data.size() <= buffer->capacity)
+								{
+									std::memcpy(buf, new_data.data(), new_data.size());
+									buffer->size = new_data.size();
+									return true;
+								}
+							}
 						}
-					}
-
-
-					if (var_server_logging->current.enabled())
-					{
-						const auto modified_data = json.dump(-1);
-
-						if (modified_data.size() <= buffer->capacity)
-						{
-							std::memcpy(game::fox::Buffer_::GetBuffer(buffer), modified_data.data(), modified_data.size());
-							buffer->size = modified_data.size();
-						}
-						else
-						{
-							console::error("[server logging] Modified data too large for buffer");
-						}
-
-						const auto path = get_dump_path(cmd, false);
-						utils::io::write_file(path, json.dump(4));
-
-						const auto raw_path = get_raw_dump_path(cmd, false);
-						utils::io::write_file(raw_path, modified_data);
-					}
-				}
-
-				if (var_server_logging->current.enabled())
-				{
-					try
-					{
-						const auto encrypted_json = nlohmann::json::parse(get_fox_buffer(buffer));
-						const auto encrypted_cmd = encrypted_json.value("msgid", "unknown");
-
-						const auto encrypted_path = get_encrypted_dump_path(encrypted_cmd, false);
-						utils::io::write_file(encrypted_path, get_fox_buffer(buffer));
-					}
-					catch (...)
-					{
 					}
 				}
 			}
-
-			return res;
+			catch (...)
+			{
+			}
+			return false;
 		}
 
 		bool intercept_add_follow_request(game::fox::Buffer* buffer)
 		{
-			if (add_follow_override_enabled && buffer != nullptr)
+			if (!add_follow_override_enabled || buffer == nullptr)
 			{
-				try
+				return false;
+			}
+
+			try
+			{
+				const auto buf = game::fox::Buffer_::GetBuffer(buffer);
+				const auto buf_size = game::fox::Buffer_::GetSize(buffer);
+
+				if (buf != nullptr && buf_size > 0)
 				{
-					const auto buf = game::fox::Buffer_::GetBuffer(buffer);
-					const auto buf_size = game::fox::Buffer_::GetSize(buffer);
+					const std::string raw_data{buf, buf + buf_size};
+					auto json = nlohmann::json::parse(raw_data, nullptr, false);
 
-					if (buf != nullptr && buf_size > 0)
+					if (!json.is_discarded() && json.is_object() && json.contains("msgid") &&
+						json["msgid"].is_string() && json["msgid"].get<std::string>() == "CMD_ADD_FOLLOW")
 					{
-						const std::string raw_data{buf, buf + buf_size};
-						auto json = nlohmann::json::parse(raw_data, nullptr, false);
+						console::info("[FOB] Intercepting CMD_ADD_FOLLOW request");
 
-						if (!json.is_discarded() && json.is_object() && json.contains("msgid") &&
-							json["msgid"].is_string() && json["msgid"].get<std::string>() == "CMD_ADD_FOLLOW")
+						if (add_follow_override_steam_id != 0)
 						{
-							console::info("[FOB] Intercepting CMD_ADD_FOLLOW request");
+							console::info("[FOB]   Setting steam_id: %llu", add_follow_override_steam_id);
+							json["steam_id"] = add_follow_override_steam_id;
+						}
 
-							if (add_follow_override_steam_id != 0)
+						if (add_follow_override_player_id != 0)
+						{
+							console::info("[FOB]   Setting player_id: %llu", add_follow_override_player_id);
+							json["player_id"] = add_follow_override_player_id;
+						}
+
+						const auto new_data = json.dump(-1);
+
+						if (new_data.size() <= buffer->capacity)
+						{
+							std::memcpy(buf, new_data.data(), new_data.size());
+							buffer->size = new_data.size();
+							console::info("[FOB]   Modified request (size: %zu)", new_data.size());
+
+							if (add_follow_override_one_shot)
 							{
-								console::info("[FOB]   Setting steam_id: %llu", add_follow_override_steam_id);
-								json["steam_id"] = add_follow_override_steam_id;
+								add_follow_override_enabled = false;
+								add_follow_override_one_shot = false;
+								console::info("[FOB]   One-shot override consumed, auto-disabled.");
 							}
 
-							if (add_follow_override_player_id != 0)
-							{
-								console::info("[FOB]   Setting player_id: %llu", add_follow_override_player_id);
-								json["player_id"] = add_follow_override_player_id;
-							}
-
-							const auto new_data = json.dump(-1);
-
-							if (new_data.size() <= buffer->capacity)
-							{
-								std::memcpy(buf, new_data.data(), new_data.size());
-								buffer->size = new_data.size();
-								console::info("[FOB]   Modified request (size: %zu)", new_data.size());
-
-								if (add_follow_override_one_shot)
-								{
-									add_follow_override_enabled = false;
-									add_follow_override_one_shot = false;
-									console::info("[FOB]   One-shot override consumed, auto-disabled.");
-								}
-
-								return true;
-							}
-							else
-							{
-								console::error("[FOB]   New data too large (%zu > capacity %zu)",
-									new_data.size(), buffer->capacity);
-							}
+							return true;
+						}
+						else
+						{
+							console::error("[FOB]   New data too large (%zu > capacity %zu)",
+								new_data.size(), buffer->capacity);
 						}
 					}
 				}
-				catch (const std::exception& e)
-				{
-					console::error("[FOB] Failed to intercept CMD_ADD_FOLLOW: %s", e.what());
-				}
 			}
-
+			catch (...)
+			{
+			}
 			return false;
 		}
 
@@ -583,127 +489,70 @@ namespace server_logging
 			console::info("[FOB]   Go to Relationships menu -> Friends list -> select any player -> click 'Support' to trigger.");
 		}
 
-		void* http_codec_begin_encode_stub(void* this_, void* ctx, game::fox::Buffer* buffer, void* session_key)
+		void* http_codec_end_decode_stub(void* this_, void* ctx, game::fox::Buffer* buffer)
 		{
-			intercept_add_follow_request(buffer);
+			const auto res = http_codec_end_decode_hook.invoke<void*>(this_, ctx, buffer);
 
-			if (buffer != nullptr)
-			{
-				try
-				{
-					const auto buf = game::fox::Buffer_::GetBuffer(buffer);
-					const auto buf_size = game::fox::Buffer_::GetSize(buffer);
-
-					if (buf != nullptr && buf_size > 0)
-					{
-						const std::string raw{buf, buf + buf_size};
-						auto json = nlohmann::json::parse(raw, nullptr, false);
-						if (!json.is_discarded() && json.is_object() && json.contains("msgid") &&
-							json["msgid"].is_string() && json["msgid"].get<std::string>() == "CMD_SEND_SNEAK_RESULT")
-						{
-							const auto dp = json.value("damage_point", 0);
-							const auto rp = json.value("retaliate_point", 0);
-							const auto result = json.value("sneak_result", "?");
-							console::info("[FOB] CMD_SEND_SNEAK_RESULT: result=%s, damage_point=%d, retaliate_point=%d",
-								result.c_str(), dp, rp);
-						}
-					}
-				}
-				catch (...)
-				{
-				}
-			}
-
-			if (list_type_convert_enabled && buffer != nullptr)
-			{
-				try
-				{
-					const auto buf = game::fox::Buffer_::GetBuffer(buffer);
-					const auto buf_size = game::fox::Buffer_::GetSize(buffer);
-
-					if (buf != nullptr && buf_size > 0)
-					{
-						const std::string raw_data{buf, buf + buf_size};
-						auto json = nlohmann::json::parse(raw_data, nullptr, false);
-
-						if (!json.is_discarded() && json.is_object() && json.contains("msgid") &&
-							json["msgid"].is_string() && json["msgid"].get<std::string>() == "CMD_GET_FOB_TARGET_LIST")
-						{
-							if (json.contains("type") && json["type"].is_string())
-							{
-								const auto current_type = json["type"].get<std::string>();
-								if (current_type == list_type_convert_from)
-								{
-									console::info("[FOB] Converting list type: %s -> %s",
-										list_type_convert_from.c_str(), list_type_convert_to.c_str());
-									json["type"] = list_type_convert_to;
-
-									const auto new_data = json.dump(-1);
-									if (new_data.size() <= buffer->capacity)
-									{
-										std::memcpy(buf, new_data.data(), new_data.size());
-										buffer->size = new_data.size();
-										console::info("[FOB] List type converted successfully!");
-									}
-									else
-									{
-										console::error("[FOB] Modified request too large for buffer!");
-									}
-								}
-							}
-						}
-					}
-				}
-				catch (const std::exception& e)
-				{
-					console::error("[FOB] Failed to convert list type: %s", e.what());
-				}
-			}
-
-			if (var_server_logging->current.enabled())
 			{
 				const auto raw_data = get_fox_buffer(buffer);
 
-				try
+				auto json = nlohmann::json::parse(raw_data, nullptr, false);
+				if (!json.is_discarded() && json.is_object())
 				{
-					const auto json = nlohmann::json::parse(raw_data);
 					const auto cmd = json.value("msgid", "unknown");
 
-					console::info("[server logging] sending request for command \"%s\"", cmd.data());
+					console::info("[server logging] received response for command \"%s\"", cmd.data());
 
-					const auto path = get_dump_path(cmd, true);
-					utils::io::write_file(path, json.dump(4));
+					// Capture session key from CMD_REQAUTH_HTTPS
+					if (cmd == "CMD_REQAUTH_HTTPS" || cmd == "CMD_REQAUTH")
+					{
+						if (json.contains("crypto_key") && json["crypto_key"].is_string())
+						{
+							const auto crypto_key = json["crypto_key"].get<std::string>();
+							tpp_session_key = crypto_key;
+							tpp_session_key_available = true;
+							tpp_client_instance_.set_session_key(crypto_key);
 
-					const auto raw_path = get_raw_dump_path(cmd, true);
-					utils::io::write_file(raw_path, raw_data);
-				}
-				catch (const std::exception& e)
-				{
-					console::error("[server logging] failed to parse request: %s", e.what());
+							console::info("[TPP Client] =============================================");
+							console::info("[TPP Client] Session key captured from %s", cmd.data());
+							console::info("[TPP Client] Session key: %s", crypto_key.substr(0, 20).c_str());
+							console::info("[TPP Client] =============================================");
+							console::info("[TPP Client] You can now use fob_open_wormhole directly!");
+						}
+					}
 
-					const auto raw_path = get_raw_dump_path("parse_error", true);
-					utils::io::write_file(raw_path, raw_data);
-				}
-			}
-
-			const auto res = http_codec_begin_encode_hook.invoke<void*>(this_, ctx, buffer, session_key);
-
-			if (var_server_logging->current.enabled())
-			{
-				try
-				{
-					const auto json = nlohmann::json::parse(get_fox_buffer(buffer));
-					const auto cmd = json.value("msgid", "unknown");
-
-					const auto encrypted_path = get_encrypted_dump_path(cmd, true);
-					utils::io::write_file(encrypted_path, get_fox_buffer(buffer));
-				}
-				catch (...)
-				{
+					if (var_server_logging->current.enabled())
+					{
+						const auto path = get_dump_path(cmd, false);
+						utils::io::write_file(path, json.dump(4));
+					}
 				}
 			}
 
 			return res;
+		}
+
+		void* http_codec_begin_encode_stub(void* this_, void* ctx, game::fox::Buffer* buffer, void* session_key)
+		{
+			// Intercept CMD_ADD_FOLLOW
+			intercept_add_follow_request(buffer);
+
+			// Intercept CMD_GET_FOB_TARGET_LIST
+			intercept_list_type_convert(buffer);
+
+			if (var_server_logging->current.enabled())
+			{
+				const auto data = get_fox_buffer(buffer);
+				const auto json = nlohmann::json::parse(data);
+				const auto cmd = json["msgid"].get<std::string>();
+
+				console::info("[server logging] sending request for command \"%s\"", cmd.data());
+
+				const auto path = get_dump_path(cmd, true);
+				utils::io::write_file(path, json.dump(4));
+			}
+
+			return http_codec_begin_encode_hook.invoke<void*>(this_, ctx, buffer, session_key);
 		}
 
 		float get_heartbeat_time()
@@ -728,6 +577,75 @@ namespace server_logging
 			console::info("[server logging] set heartbeat: %i\n", value);
 			utils::hook::invoke<void>(SELECT_VALUE(0x1407DE720, 0x14057BEB0, 0x1407DD820, 0x14057B660), this_, value);
 		}
+
+		std::uint64_t get_my_steam_id()
+		{
+			try
+			{
+				const auto steam_user = (*game::SteamUser)();
+				if (steam_user != nullptr)
+				{
+					game::steam_id steam_id{};
+					steam_user->__vftable->GetSteamID(steam_user, &steam_id);
+					return steam_id.bits;
+				}
+			}
+			catch (...)
+			{
+			}
+			return 0;
+		}
+
+		std::uint64_t get_own_player_id_from_cache_int()
+		{
+			try
+			{
+				const auto my_steam_id = get_my_steam_id();
+				if (my_steam_id != 0)
+				{
+					const auto cached_player = fob_target::get_cached_player(my_steam_id);
+					if (cached_player.has_value())
+					{
+						return cached_player->player_id;
+					}
+				}
+			}
+			catch (...)
+			{
+			}
+			return 0;
+		}
+
+		// Accessor functions for public API
+		std::uint64_t public_get_my_player_id()
+		{
+			return get_own_player_id_from_cache_int();
+		}
+
+		bool public_has_session_key()
+		{
+			return tpp_session_key_available;
+		}
+
+		bool public_open_wormhole(std::uint64_t target_player_id, std::uint64_t my_player_id)
+		{
+			return tpp_client_instance_.open_wormhole(target_player_id, my_player_id);
+		}
+	}
+
+	bool has_session_key()
+	{
+		return public_has_session_key();
+	}
+
+	bool open_wormhole(std::uint64_t target_player_id, std::uint64_t my_player_id)
+	{
+		return public_open_wormhole(target_player_id, my_player_id);
+	}
+
+	std::uint64_t get_my_player_id_from_cache()
+	{
+		return public_get_my_player_id();
 	}
 
 	class component final : public component_interface
@@ -744,12 +662,93 @@ namespace server_logging
 			http_codec_begin_encode_hook.create(SELECT_VALUE(0x141CE2DC0, 0x140C41730, 0x14D88F960, 0x1494F5CD0), http_codec_begin_encode_stub);
 			http_codec_end_decode_hook.create(SELECT_VALUE(0x141CE35E0, 0x140C41F50, 0x141CE3090, 0x140C42520), http_codec_end_decode_stub);
 
-			if (game::environment::is_mgo())
+			utils::hook::far_jump<BASE_ADDRESS>(SELECT_VALUE(0x1407DFC08, 0x14057D3D8, 0x1407DED08, 0x14057CB88), utils::hook::assemble(session_daemon_update_stub));
+			utils::hook::call(SELECT_VALUE(0x1407D2736, 0x140572166, 0x1407D16B6, 0x14651E946), net_daemon_set_heartbeat);
+
+			if (!game::environment::is_tpp())
 			{
-				utils::hook::far_jump<BASE_ADDRESS>(SELECT_VALUE(0x1407DF0C8, 0x14057D1B8, 0x1407DED08, 0x14057CB88), utils::hook::assemble(session_daemon_update_stub));
-				utils::hook::call(SELECT_VALUE(0x1407D1A76, 0x144DA6856, 0x1407D16B6, 0x14651E946), net_daemon_set_heartbeat);
+				return;
 			}
 
+			// fob_open_wormhole command
+			command::add("fob_open_wormhole", [](const command::params& params)
+			{
+				if (params.size() < 2)
+				{
+					console::info("Usage: fob_open_wormhole <target_steam_id>");
+					console::info("Example: fob_open_wormhole 76561199505076493");
+					console::info("");
+					console::info("Opens a wormhole to the target player's FOB directly.");
+					console::info("Requires session key from CMD_REQAUTH_HTTPS.");
+					console::info("");
+					console::info("Special values:");
+					console::info("  fob_open_wormhole status   - Show TPP client status");
+					return;
+				}
+
+				const auto first_arg = params.get(1);
+
+				if (first_arg == "status")
+				{
+					console::info("TPP Client status:");
+					console::info("  session_key: %s", tpp_session_key_available ? "AVAILABLE" : "NOT AVAILABLE");
+					console::info("  my_player_id: %llu", get_my_player_id_from_cache());
+					console::info("  my_steam_id: %llu", get_my_steam_id());
+					return;
+				}
+
+				const auto target_steam_id = params.get_uint64(1);
+
+				if (target_steam_id == 0)
+				{
+					console::info("Invalid steam_id.");
+					return;
+				}
+
+				console::info("[FOB] fob_open_wormhole called:");
+				console::info("[FOB]   target_steam_id: %llu", target_steam_id);
+
+				// Get cached info for target
+				const auto cached_target = fob_target::get_cached_player(target_steam_id);
+				std::uint64_t target_player_id = 0;
+
+				if (cached_target.has_value())
+				{
+					target_player_id = cached_target->player_id;
+					console::info("[FOB]   target_player_id (from cache): %llu", target_player_id);
+				}
+				else
+				{
+					console::info("[FOB]   target not in cache, using steam_id as player_id");
+					target_player_id = target_steam_id;  // Fallback, may not work
+				}
+
+				// Get our player_id from cache
+				const auto my_player_id = get_my_player_id_from_cache();
+				if (my_player_id == 0)
+				{
+					console::error("[FOB] Cannot determine your player_id!");
+					console::error("[FOB] Browse the FOB list first so the mod can cache your info.");
+					return;
+				}
+
+				console::info("[FOB]   my_player_id: %llu", my_player_id);
+
+				console::info("[FOB] Sending CMD_OPEN_WORMHOLE via TPP client...");
+				const bool success = tpp_client_instance_.open_wormhole(target_player_id, my_player_id);
+
+				if (success)
+				{
+					console::info("[FOB] Wormhole command sent successfully!");
+					console::info("[FOB] The server should open the wormhole momentarily.");
+				}
+				else
+				{
+					console::error("[FOB] Failed to send wormhole command!");
+				}
+			});
+
+			// fob_add_support command
 			command::add("fob_add_support", [](const command::params& params)
 			{
 				if (params.size() < 2)
@@ -791,165 +790,9 @@ namespace server_logging
 				}
 
 				send_add_follow_request(steam_id, 0);
-			},
-			"Send CMD_ADD_FOLLOW with the given steam_id (direct send)",
-			"fob_add_support <steam_id>");
+			});
 
-			command::add("fob_open_wormhole", [](const command::params& params)
-			{
-				if (params.size() < 2)
-				{
-					console::info("Usage: fob_open_wormhole <target_steam_id>");
-					console::info("Example: fob_open_wormhole 76561199505076493");
-					console::info("");
-					console::info("Directly sends CMD_OPEN_WORMHOLE to Konami server,");
-					console::info("like mgsv-client-tools.");
-					console::info("");
-					console::info("After success:");
-					console::info("  Go back to FOB menu (ESC) and re-select the target.");
-					console::info("");
-					console::info("Requirements:");
-					console::info("  - Session key from CMD_REQAUTH_HTTPS");
-					console::info("  - Target player in FOB cache");
-					console::info("  - Your player_id in FOB cache");
-					return;
-				}
-
-				const auto target_steam_id = params.get_uint64(1);
-
-				if (target_steam_id == 0)
-				{
-					console::info("Usage: fob_open_wormhole <target_steam_id>");
-					return;
-				}
-
-				if (!tpp_client_instance_.has_session_key())
-				{
-					console::error("[FOB Wormhole] No session key available!");
-					console::error("[FOB Wormhole] Please login and visit FOB menu first.");
-					return;
-				}
-
-				auto my_player_id = get_my_player_id_from_cache_impl();
-				if (my_player_id == 0)
-				{
-					console::error("[FOB Wormhole] Could not find your player_id in cache.");
-					console::error("[FOB Wormhole] Please access the FOB menu first.");
-					return;
-				}
-
-				const auto target_cached = fob_target::get_cached_player(target_steam_id);
-				if (!target_cached.has_value())
-				{
-					console::error("[FOB Wormhole] Could not find target player_id in cache.");
-					console::error("[FOB Wormhole]   target_steam_id: %llu", target_steam_id);
-					console::error("[FOB Wormhole] Please access the FOB menu first.");
-					return;
-				}
-
-				const auto target_player_id = target_cached->player_id;
-
-				console::info("[FOB Wormhole] Sending CMD_OPEN_WORMHOLE...");
-				console::info("[FOB Wormhole]   target_player_id: %u", target_player_id);
-				console::info("[FOB Wormhole]   my_player_id:     %llu", (unsigned long long)my_player_id);
-
-				const bool success = tpp_client_instance_.open_wormhole(target_player_id, my_player_id);
-
-				if (success)
-				{
-					console::info("==================================================");
-					console::info("WORMHOLE OPENED SUCCESSFULLY!");
-					console::info("==================================================");
-					console::info("Go back to FOB menu and re-select the target.");
-					console::info("The blockade should now be bypassed.");
-				}
-				else
-				{
-					console::error("==================================================");
-					console::error("WORMHOLE REQUEST FAILED!");
-					console::error("==================================================");
-				}
-			},
-			"Open wormhole to bypass FOB blockade (direct send)",
-			"fob_open_wormhole <target_steam_id>");
-
-			command::add("fob_get_target_detail", [](const command::params& params)
-			{
-				if (params.size() < 2)
-				{
-					console::info("Usage: fob_get_target_detail <target_steam_id>");
-					console::info("Example: fob_get_target_detail 76561199505076493");
-					console::info("");
-					console::info("Sends CMD_GET_FOB_TARGET_DETAIL directly to Konami servers.");
-					console::info("Use this AFTER running fob_open_wormhole to get target FOB details.");
-					console::info("");
-					console::info("Mother base ID is automatically retrieved from cache.");
-					console::info("");
-					console::info("Requires:");
-					console::info("  - Session key from CMD_REQAUTH_HTTPS");
-					console::info("  - Target player in FOB cache");
-					return;
-				}
-
-				const auto target_steam_id = params.get_uint64(1);
-
-				if (!tpp_client_instance_.has_session_key())
-				{
-					console::error("[FOB Detail] No session key available!");
-					console::error("[FOB Detail] Please wait for CMD_REQAUTH_HTTPS response first.");
-					return;
-				}
-
-				const auto target_cached = fob_target::get_cached_player(target_steam_id);
-				if (!target_cached.has_value())
-				{
-					console::error("[FOB Detail] Could not find target in cache.");
-					console::error("[FOB Detail]   target_steam_id: %llu", target_steam_id);
-					console::error("[FOB Detail] Please access the FOB menu first to populate the cache.");
-					console::error("[FOB Detail] Or add the target using fob_add_target first.");
-					return;
-				}
-
-				const auto mother_base_id = static_cast<std::uint64_t>(target_cached->mother_base_id);
-
-				if (mother_base_id == 0)
-				{
-					console::error("[FOB Detail] Mother base ID not found in cache.");
-					console::error("[FOB Detail]   target_steam_id: %llu", target_steam_id);
-					console::error("[FOB Detail]   target_player_id: %llu", static_cast<std::uint64_t>(target_cached->player_id));
-					console::error("[FOB Detail] Please try browsing FOB lists again.");
-					return;
-				}
-
-				console::info("[FOB Detail] Found target in cache:");
-				console::info("[FOB Detail]   steam_id:       %llu", target_steam_id);
-				console::info("[FOB Detail]   player_id:      %llu", static_cast<std::uint64_t>(target_cached->player_id));
-				console::info("[FOB Detail]   mother_base_id: %llu", mother_base_id);
-				console::info("[FOB Detail]   name:           %s", target_cached->name.c_str());
-
-				console::info("[FOB Detail] Sending CMD_GET_FOB_TARGET_DETAIL...");
-
-				const bool success = tpp_client_instance_.get_fob_target_detail(mother_base_id);
-
-				if (success)
-				{
-					console::info("==================================================");
-					console::info("FOB DETAIL REQUEST SENT!");
-					console::info("==================================================");
-					console::info("Check the console above for server response.");
-					console::info("==================================================");
-				}
-				else
-				{
-					console::error("==================================================");
-					console::error("FOB DETAIL REQUEST FAILED!");
-					console::error("==================================================");
-				}
-			},
-			"Send CMD_GET_FOB_TARGET_DETAIL to get FOB information",
-			"fob_get_target_detail <target_steam_id>");
-
-
+			// fob_convert_list_type command
 			command::add("fob_convert_list_type", [](const command::params& params)
 			{
 				if (params.size() < 2)
@@ -999,16 +842,12 @@ namespace server_logging
 				console::info("[FOB]   From: %s", from_type.c_str());
 				console::info("[FOB]   To:   %s", to_type.c_str());
 				console::info("[FOB] ================================================");
-				console::info("[FOB] When the game requests '%s' list,",
-					from_type.c_str());
-				console::info("[FOB] it will be converted to '%s' list request.",
-					to_type.c_str());
+				console::info("[FOB] When the game requests '%s' list,", from_type.c_str());
+				console::info("[FOB] it will be converted to '%s' list request.", to_type.c_str());
 				console::info("[FOB] ================================================");
-			},
-			"Convert FOB list type in requests (e.g. PICKUP -> FOLLOW)",
-			"fob_convert_list_type <from> <to>");
+			});
 
-
+			// fob_status command
 			command::add("fob_status", [](const command::params& params)
 			{
 				console::info("========== FOB Status ==========");
@@ -1019,42 +858,18 @@ namespace server_logging
 					console::info("  from: %s -> to: %s",
 						list_type_convert_from.c_str(), list_type_convert_to.c_str());
 				}
-				console::info("fob_add_target count:    %zu",
-					fob_target::get_targets().size());
-				console::info("fob_target cache count:  %zu",
-					fob_target::get_cached_players().size());
+				console::info("fob_add_support:");
+				console::info("  enabled:  %s", add_follow_override_enabled ? "yes" : "no");
+				console::info("  one_shot: %s", add_follow_override_one_shot ? "yes" : "no");
+				console::info("  steam_id: %llu", add_follow_override_steam_id);
+				console::info("  player_id: %llu", add_follow_override_player_id);
+				console::info("TPP Client:");
+				console::info("  session_key: %s", tpp_session_key_available ? "AVAILABLE" : "NOT AVAILABLE");
+				console::info("  my_player_id: %llu", get_my_player_id_from_cache());
 				console::info("================================");
-			},
-			"Show FOB status and configuration",
-			"fob_status");
-
-
+			});
 		}
 	};
 }
 
-
 REGISTER_COMPONENT(server_logging::component)
-
-namespace server_logging
-{
-	bool open_wormhole(std::uint64_t target_player_id, std::uint64_t my_player_id)
-	{
-		if (!tpp_client_instance_.has_session_key())
-		{
-			console::error("[FOB Wormhole] No session key available!");
-			return false;
-		}
-		return tpp_client_instance_.open_wormhole(target_player_id, my_player_id);
-	}
-
-	bool has_session_key()
-	{
-		return tpp_client_instance_.has_session_key();
-	}
-
-	std::uint64_t get_my_player_id_from_cache()
-	{
-		return get_my_player_id_from_cache_impl();
-	}
-}

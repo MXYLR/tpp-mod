@@ -694,18 +694,14 @@ namespace game_console
 				return;
 			}
 
-			command::add("clear", clear_console,
-			    "Clear the in-game console output",
-			    "clear");
+			command::add("clear", clear_console);
 
 			command::add("toggleconsole", []()
 			{
 				clear_input();
 				con.toggled = !con.toggled;
 				con.show_output = false;
-			},
-			    "Toggle the in-game console open/closed",
-			    "toggleconsole");
+			});
 
 			var_con_input_box_color = vars::register_color(
 				"con_input_box_color",
