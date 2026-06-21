@@ -151,6 +151,10 @@ namespace fob_gui
 		"cheat_add_gmp",
 		"cheat_add_heroic_point",
 		"cheat_set_ogre_point",
+		"cheat_add_buddy_point",
+		"cheat_add_processing_resource",
+		"cheat_add_usable_resource",
+		"cheat_restore_quiet",
 		"fob_add_support",
 		"fob_open_wormhole",
 		"fob_get_target_detail",
@@ -461,7 +465,7 @@ namespace fob_gui
 		size_t pos = 0;
 		while (pos < data.size())
 		{
-			size_t end_pos = data.find("\n", pos);
+			size_t end_pos = data.find("||", pos);
 			std::string log_entry_str;
 			if (end_pos == std::string::npos)
 			{
@@ -471,7 +475,7 @@ namespace fob_gui
 			else
 			{
 				log_entry_str = data.substr(pos, end_pos - pos);
-				pos = end_pos + 1;
+				pos = end_pos + 2;
 			}
 
 			size_t p1 = log_entry_str.find("|");
@@ -1534,12 +1538,17 @@ namespace fob_gui
 			{"cheat_add_gmp", "", true},
 			{"cheat_add_heroic_point", "", true},
 			{"cheat_set_ogre_point", "", true},
+			{"cheat_add_buddy_point", "", true},
+			{"cheat_add_processing_resource", "", true},
+			{"cheat_add_usable_resource", "", true},
+			{"cheat_restore_quiet", "", true},
 		};
 
 		static const bool cheat_needs_param[] = {
 			true, true,
 			false,
 			true, true, true,
+			true, true, true, false,
 		};
 
 		static const char* cheat_param_hints[] = {
@@ -1549,9 +1558,13 @@ namespace fob_gui
 			"amount (500000)",
 			"amount (50000)",
 			"amount (50000)",
+			"buddy point (e.g. 0 255)",
+			"index amount (e.g. 0 5000)",
+			"index amount (e.g. 0 5000)",
+			"",
 		};
 
-		static char cheat_param_buf[6][128] = {};
+		static char cheat_param_buf[10][128] = {};
 
 		ImGui::OpenPopup("Cheats");
 		ImVec2 center = ImGui::GetMainViewport()->GetCenter();
@@ -1563,7 +1576,7 @@ namespace fob_gui
 			if (ImGui::Button("Apply ALL##cheats", ImVec2(btn_w() * 1.5f, btn_h())))
 			{
 				int count = 0;
-				for (int i = 0; i < 6; i++)
+				for (int i = 0; i < 10; i++)
 				{
 					const auto& opt = cheat_options[i];
 					std::string cmd;
@@ -1593,7 +1606,7 @@ namespace fob_gui
 			float child_h = ImGui::GetContentRegionAvail().y - 60 * scale_factor;
 			if (ImGui::BeginChild("##cheats_list", ImVec2(0, child_h), true))
 			{
-				for (int i = 0; i < 6; i++)
+				for (int i = 0; i < 10; i++)
 				{
 					const auto& opt = cheat_options[i];
 					ImGui::PushID(i);
@@ -1652,7 +1665,7 @@ namespace fob_gui
 			if (ImGui::Button("Close##cheats", ImVec2(btn_w(), btn_h())))
 			{
 				show_cheats_dialog.store(false);
-				for (int i = 0; i < 6; i++) cheat_param_buf[i][0] = '\0';
+				for (int i = 0; i < 10; i++) cheat_param_buf[i][0] = '\0';
 				settings_status_msg.clear();
 				ImGui::CloseCurrentPopup();
 			}
@@ -2083,24 +2096,22 @@ namespace fob_gui
 
 			ImGui::Separator();
 
-			ImGui::BeginChild("##log_content", ImVec2(0, 0), true, ImGuiWindowFlags_HorizontalScrollbar);
+			ImGui::BeginChild("##log_content", ImVec2(0, 0), true);
 			{
 				std::lock_guard<std::mutex> lock(log_mutex);
 				for (const auto& entry : log_entries)
 				{
 					ImVec4 color;
-				if (entry.type == "error")
+				if (entry.type == "1" || entry.type == "error")
 					color = ImVec4(1.0f, 0.3f, 0.3f, 1.0f);
-				else if (entry.type == "success")
-					color = ImVec4(0.3f, 1.0f, 0.3f, 1.0f);
-				else if (entry.type == "debug")
+				else if (entry.type == "2" || entry.type == "debug")
 					color = ImVec4(0.3f, 0.8f, 1.0f, 1.0f);
-				else if (entry.type == "warning")
+				else if (entry.type == "3" || entry.type == "warning")
 					color = ImVec4(1.0f, 0.9f, 0.3f, 1.0f);
-				else // info
+				else // info / "7"
 					color = ImVec4(0.9f, 0.9f, 0.9f, 1.0f);
 					ImGui::PushStyleColor(ImGuiCol_Text, color);
-					ImGui::TextUnformatted(entry.message.c_str());
+					ImGui::TextWrapped("%s", entry.message.c_str());
 					ImGui::PopStyleColor();
 				}
 			}
@@ -2119,14 +2130,14 @@ namespace fob_gui
 		scale_factor = g_window_config.font_scale;
 		snprintf(scale_input, sizeof(scale_input), "%.1f", scale_factor);
 
-		WNDCLASSEXA wc = { sizeof(WNDCLASSEXA), CS_CLASSDC, WndProc, 0L, 0L,
-			GetModuleHandle(nullptr), nullptr, nullptr, nullptr, nullptr,
-			"FOBGuiWndClass", nullptr };
-		RegisterClassExA(&wc);
-		g_hwnd = CreateWindowExA(0, wc.lpszClassName, "TPP-Mod Control",
+		WNDCLASSEXW wc = { sizeof(WNDCLASSEXW), CS_CLASSDC, WndProc, 0L, 0L,
+			GetModuleHandleW(nullptr), nullptr, nullptr, nullptr, nullptr,
+			L"FOBGuiWndClass", nullptr };
+		RegisterClassExW(&wc);
+		g_hwnd = CreateWindowExW(0, wc.lpszClassName, L"TPP-Mod Control",
 			WS_OVERLAPPEDWINDOW,
 			g_window_config.x, g_window_config.y,
-			g_window_config.w, g_window_config.h, nullptr, nullptr, wc.hInstance, nullptr);
+			g_window_config.w, g_window_config.h, nullptr, nullptr, GetModuleHandleW(nullptr), nullptr);
 
 		create_d3d_device();
 
@@ -2239,7 +2250,7 @@ namespace fob_gui
 		cleanup_d3d();
 		disconnect_pipe();
 		DestroyWindow(g_hwnd);
-		UnregisterClassA(wc.lpszClassName, wc.hInstance);
+		UnregisterClassW(wc.lpszClassName, wc.hInstance);
 
 		return 0;
 	}

@@ -509,6 +509,11 @@ namespace fob_control
 		}
 	}
 
+	void add_log(int type, const std::string& message)
+	{
+		add_log_entry(type, message);
+	}
+
 	class component final : public component_interface
 	{
 	public:
