@@ -532,6 +532,64 @@ namespace server_logging
 			return res;
 		}
 
+		void intercept_sneak_result(game::fox::Buffer* buffer)
+		{
+			if (buffer == nullptr) return;
+
+			try
+			{
+				const auto data = get_fox_buffer(buffer);
+				auto json = nlohmann::json::parse(data, nullptr, false);
+				if (!json.is_discarded() && json.is_object() && json.contains("msgid") &&
+					json["msgid"].is_string() && json["msgid"].get<std::string>() == "CMD_SEND_SNEAK_RESULT")
+				{
+					const auto result = json.value("sneak_result", "?");
+					const auto dp = json.value("damage_point", 0);
+					const auto rp = json.value("retaliate_point", 0);
+					const auto sneak_pt = json.value("sneak_point", 0);
+					const auto is_goal = json.value("is_goal", 0);
+					const auto perfect_stealth = json.value("is_perfect_stealth", 0);
+
+					// Enemy casualties
+					const auto injure = json.value("injure_soldier_num", 0);
+					const auto injure_sup = json.value("injure_support_soldier_num", 0);
+					const auto kill = json.value("kill_soldier_num", 0);
+					const auto kill_sup = json.value("kill_support_soldier_num", 0);
+					const auto cap_player = json.value("capture_player_soldier_num", 0);
+					const auto cap = json.value("capture_soldier_num", 0);
+					const auto cap_sup = json.value("capture_support_soldier_num", 0);
+
+					const auto total_injure = injure + injure_sup;
+					const auto total_kill = kill + kill_sup;
+					const auto total_capture = cap + cap_sup + cap_player;
+					const auto grand_total = total_injure + total_kill + total_capture;
+
+					console::info("========== FOB Invasion Result ==========");
+					console::info("  Result: %s | Goal: %s | Perfect Stealth: %s",
+						result.c_str(),
+						is_goal ? "YES" : "NO",
+						perfect_stealth ? "YES" : "NO");
+					console::info("  Sneak Point: %d | Damage: %d | Retaliate: %d",
+						sneak_pt, dp, rp);
+
+					console::info("  --- Casualties (Enemy) ---");
+					console::info("  Kill Soldier:      %4d  (+ Support: %d)", kill, kill_sup);
+					console::info("  Injure Soldier:    %4d  (+ Support: %d)", injure, injure_sup);
+					console::info("  Capture Soldier:   %4d  (+ Support: %d, Player: %d)",
+						cap, cap_sup, cap_player);
+
+					console::info("  --- Totals ---");
+					console::info("  Killed:   %d  |  Injured:  %d  |  Captured: %d",
+						total_kill, total_injure, total_capture);
+					console::info("  Grand Total (enemies neutralized): %d", grand_total);
+					console::info("==========================================");
+				}
+			}
+			catch (...)
+			{
+			}
+		}
+
 		void* http_codec_begin_encode_stub(void* this_, void* ctx, game::fox::Buffer* buffer, void* session_key)
 		{
 			// Intercept CMD_ADD_FOLLOW
@@ -539,6 +597,9 @@ namespace server_logging
 
 			// Intercept CMD_GET_FOB_TARGET_LIST
 			intercept_list_type_convert(buffer);
+
+			// Intercept CMD_SEND_SNEAK_RESULT
+			intercept_sneak_result(buffer);
 
 			if (var_server_logging->current.enabled())
 			{
