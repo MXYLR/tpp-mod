@@ -6,6 +6,7 @@
 #include "command.hpp"
 #include "vars.hpp"
 #include "game_console.hpp"
+#include "fob_gui.hpp"
 
 #include <utils/thread.hpp>
 #include <utils/string.hpp>
@@ -123,6 +124,7 @@ namespace console
 			if (type != con_type_debug)
 			{
 				game_console::print(message);
+				fob_control::add_log(type, message);
 			}
 
 			update();
