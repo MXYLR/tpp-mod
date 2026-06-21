@@ -188,9 +188,7 @@ namespace text_chat::mutes
 				}
 
 				mute_player(params.join(1), false);
-			},
-			"Mute a player by name or Steam ID",
-			"mute <name|steam_id>");
+			});
 
 			command::add("unmute", [](const command::params& params)
 			{
@@ -201,9 +199,7 @@ namespace text_chat::mutes
 				}
 
 				mute_player(params.join(1), true);
-			},
-			"Unmute a player by name or Steam ID",
-			"unmute <name|steam_id>");
+			});
 
 			command::add("mutelist", [](const command::params& params)
 			{
@@ -220,9 +216,7 @@ namespace text_chat::mutes
 						console::info("%s (%lli)\n", name, steam_id);
 					}
 				});
-			},
-			"List all muted players",
-			"mutelist");
+			});
 
 			command::add("clearmutes", [](const command::params& params)
 			{
@@ -233,9 +227,7 @@ namespace text_chat::mutes
 				});
 
 				console::info("Mute list was cleared", false);
-			},
-			"Clear the mute list",
-			"clearmutes");
+			});
 		}
 	};
 }

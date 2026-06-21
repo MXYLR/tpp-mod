@@ -172,25 +172,7 @@ namespace custom_server
 			return CreateFileW(new_path.data(), desired_access, share_mode, security_attributes, creation_disp, flags, template_file);
 		}
 
-	bool is_using_custom_server()
-	{
-		return custom_url[0] != 0;
-	}
-
-	const char* get_custom_url()
-	{
-		return custom_url;
-	}
-
-	class component final : public component_interface
-	{
-	public:
-		void pre_load() override
-		{
-			var_custom_server = vars::register_string("net_custom_server", "", vars::var_flag_saved | vars::var_flag_latched, "custom server url");
-		}
-
-		void start() override
+		void apply_custom_server()
 		{
 			const auto custom_server = var_custom_server->current.get_string();
 

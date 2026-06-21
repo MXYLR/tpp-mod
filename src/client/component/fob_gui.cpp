@@ -40,9 +40,6 @@ namespace fob_control
 		uint64_t target_steam_id = 0;
 		uint64_t my_player_id = 0;
 
-		constexpr const wchar_t* PIPE_NAME = L"\\\\.\\pipe\\TPPMod_FOBControl";
-		constexpr DWORD PIPE_BUFFER_SIZE = 65536;
-
 		constexpr size_t MAX_LOG_ENTRIES = 1000;
 		struct log_entry
 		{
@@ -86,6 +83,9 @@ namespace fob_control
 			return oss.str();
 		}
 
+		constexpr const wchar_t* PIPE_NAME = L"\\\\.\\pipe\\TPPMod_FOBControl";
+		constexpr DWORD PIPE_BUFFER_SIZE = 65536;
+
 		void launch_gui_exe()
 		{
 			wchar_t dll_path[MAX_PATH] = {};
@@ -127,32 +127,55 @@ namespace fob_control
 		{
 			std::lock_guard<std::mutex> lock(data_mutex);
 			char buf[1024];
-			snprintf(buf, sizeof(buf), 
-				"my_player_id:%llu;target_player_id:%llu;target_steam_id:%llu;has_session:%d",
+			uint64_t steam_id = 0;
+			std::string player_name;
+
+			try
+			{
+				const auto steam_friends = (*game::SteamFriends)();
+				const auto steam_user = (*game::SteamUser)();
+				if (steam_user != nullptr)
+				{
+					game::steam_id sid{};
+					steam_user->__vftable->GetSteamID(steam_user, &sid);
+					steam_id = sid.bits;
+				}
+				if (steam_friends != nullptr && steam_id != 0)
+				{
+					game::steam_id sid{};
+					sid.bits = steam_id;
+					const char* name = steam_friends->__vftable->GetFriendPersonaName(steam_friends, sid);
+					if (name && name[0])
+					{
+						player_name = name;
+					}
+				}
+			}
+			catch (...) {}
+
+			snprintf(buf, sizeof(buf),
+				"my_player_id:%llu;my_steam_id:%llu;my_player_name:%s;my_steam_name:%s",
 				(unsigned long long)my_player_id,
-				(unsigned long long)target_player_id,
-				(unsigned long long)target_steam_id,
-				server_logging::has_session_key() ? 1 : 0);
+				(unsigned long long)steam_id,
+				player_name.c_str(),
+				player_name.c_str());
 			return std::string(buf);
 		}
 
 		std::string get_commands_list()
 		{
 			auto& cmds = command::get_commands();
-			std::map<std::string, std::pair<std::string, std::string>> sorted_cmds;
-			
-			for (const auto& entry : cmds)
-			{
-				sorted_cmds[entry.first] = { entry.second.description, entry.second.usage };
-			}
-
 			std::ostringstream oss;
 			bool first = true;
-			for (const auto& entry : sorted_cmds)
+			for (const auto& entry : cmds)
 			{
 				if (!first) oss << "||";
 				first = false;
-				oss << entry.first << "|" << entry.second.first << "|" << entry.second.second;
+				oss << entry.first;
+				if (!entry.second.description.empty() || !entry.second.usage.empty())
+				{
+					oss << "|" << entry.second.description << "|" << entry.second.usage;
+				}
 			}
 			return oss.str();
 		}
@@ -200,9 +223,11 @@ namespace fob_control
 				{
 					while (auto_send_active.load())
 					{
-						std::lock_guard<std::mutex> lock(data_mutex);
-						server_logging::open_wormhole(target_player_id, my_player_id);
-						auto_send_count.fetch_add(1);
+						{
+							std::lock_guard<std::mutex> lock(data_mutex);
+							server_logging::open_wormhole(target_player_id, my_player_id);
+							auto_send_count.fetch_add(1);
+						}
 						std::this_thread::sleep_for(std::chrono::milliseconds(100));
 					}
 				});
@@ -276,6 +301,26 @@ namespace fob_control
 					<< var->description;
 			}
 			return oss.str();
+		}
+
+		std::string get_steam_name(uint64_t steam_id)
+		{
+			try
+			{
+				const auto steam_friends = (*game::SteamFriends)();
+				if (steam_friends != nullptr)
+				{
+					game::steam_id sid{};
+					sid.bits = steam_id;
+					const char* name = steam_friends->__vftable->GetFriendPersonaName(steam_friends, sid);
+					if (name && name[0])
+					{
+						return std::string(name);
+					}
+				}
+			}
+			catch (...) {}
+			return "";
 		}
 
 		std::string process_command(const std::string& cmd)
@@ -377,22 +422,7 @@ namespace fob_control
 					if (!first) oss << "||";
 					first = false;
 
-					std::string steam_name;
-					try
-					{
-						const auto steam_friends = (*game::SteamFriends)();
-						if (steam_friends != nullptr)
-						{
-							game::steam_id sid{};
-							sid.bits = player.steam_id;
-							const char* name = steam_friends->__vftable->GetFriendPersonaName(steam_friends, sid);
-							if (name && name[0])
-							{
-								steam_name = name;
-							}
-						}
-					}
-					catch (...) {}
+					std::string steam_name = get_steam_name(player.steam_id);
 
 					oss << player.name << "|"
 						<< steam_name << "|"
@@ -415,22 +445,7 @@ namespace fob_control
 					if (!first) oss << "||";
 					first = false;
 
-					std::string steam_name;
-					try
-					{
-						const auto steam_friends = (*game::SteamFriends)();
-						if (steam_friends != nullptr)
-						{
-							game::steam_id sid{};
-							sid.bits = target.steam_id;
-							const char* name = steam_friends->__vftable->GetFriendPersonaName(steam_friends, sid);
-							if (name && name[0])
-							{
-								steam_name = name;
-							}
-						}
-					}
-					catch (...) {}
+					std::string steam_name = get_steam_name(target.steam_id);
 
 					oss << target.name << "|"
 						<< steam_name << "|"
@@ -504,11 +519,6 @@ namespace fob_control
 
 		void start() override
 		{
-			console::add_print_callback([](int type, const std::string& message)
-			{
-				add_log_entry(type, message);
-			});
-
 			pipe_server_running.store(true);
 			pipe_server_thread = std::thread(pipe_server_main);
 			pipe_server_thread.detach();

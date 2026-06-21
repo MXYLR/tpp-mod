@@ -311,26 +311,12 @@ project "client"
 
 	resincludedirs {"$(ProjectDir)src"}
 
-	links {"common"}
+	links {"common", "Shlwapi.lib"}
 	prebuildcommands {"pushd %{_MAIN_SCRIPT_DIR}", "tools\\premake5 generate-buildinfo", "popd"}
 
 	if _OPTIONS["copy-to"] then
 		postbuildcommands {"copy /y \"$(TargetPath)\" \"" .. _OPTIONS["copy-to"] .. "\""}
 	end
-
-	dependencies.imports()
-
-project "fob_gui_app"
-	kind "WindowedApp"
-	language "C++"
-
-	targetname "fob-gui"
-
-	files {"./src/fob_gui_app/**.cpp", "./src/fob_gui_app/**.hpp"}
-
-	includedirs {"./deps/imgui"}
-
-	links {"imgui"}
 
 	dependencies.imports()
 

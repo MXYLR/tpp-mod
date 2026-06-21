@@ -108,9 +108,7 @@ namespace hashes
 				const auto path = "tpp-mod/strings.txt";
 				utils::io::write_file(path, buffer);
 				console::info("dumped to %s", path);
-			},
-			    "Dump all hashed strings to a text file",
-			    "dumpstrings");
+			});
 		}
 	};
 }

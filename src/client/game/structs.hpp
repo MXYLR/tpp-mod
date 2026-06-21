@@ -2197,9 +2197,8 @@ namespace game
 				char __pad1[0x1000];
 			};
 
-			struct StaffController
+			struct StaffControllerImpl
 			{
-
 				enum Rank
 				{
 					RANK_E = 0,
@@ -2431,9 +2430,14 @@ namespace game
 					std::uint32_t data;
 				};
 
-				struct StaffStatusNoSync
+				union StaffStatusNoSync
 				{
-					std::uint32_t data;
+					struct
+					{
+						std::uint16_t locked : 1;
+						std::uint16_t unk : 15;
+					} fields;
+					std::uint16_t data;
 				};
 
 				struct StaffUnk1
@@ -2462,22 +2466,361 @@ namespace game
 
 				struct vtable
 				{
-
+					void(__fastcall* meth_000)(StaffControllerImpl*);
+					void(__fastcall* meth_001)(StaffControllerImpl*);
+					void(__fastcall* meth_002)(StaffControllerImpl*);
+					void(__fastcall* meth_003)(StaffControllerImpl*);
+					void(__fastcall* meth_004)(StaffControllerImpl*);
+					void(__fastcall* meth_005)(StaffControllerImpl*);
+					void(__fastcall* meth_006)(StaffControllerImpl*);
+					void(__fastcall* meth_007)(StaffControllerImpl*);
+					void(__fastcall* meth_008)(StaffControllerImpl*);
+					void(__fastcall* meth_009)(StaffControllerImpl*);
+					void(__fastcall* meth_010)(StaffControllerImpl*);
+					void(__fastcall* meth_011)(StaffControllerImpl*);
+					void(__fastcall* meth_012)(StaffControllerImpl*);
+					void(__fastcall* meth_013)(StaffControllerImpl*);
+					void(__fastcall* meth_014)(StaffControllerImpl*);
+					void(__fastcall* meth_015)(StaffControllerImpl*);
+					void(__fastcall* meth_016)(StaffControllerImpl*);
+					void(__fastcall* meth_017)(StaffControllerImpl*);
+					void(__fastcall* meth_018)(StaffControllerImpl*);
+					void(__fastcall* meth_019)(StaffControllerImpl*);
+					void(__fastcall* meth_020)(StaffControllerImpl*);
+					void(__fastcall* meth_021)(StaffControllerImpl*);
+					void(__fastcall* meth_022)(StaffControllerImpl*);
+					void(__fastcall* meth_023)(StaffControllerImpl*);
+					void(__fastcall* meth_024)(StaffControllerImpl*);
+					void(__fastcall* meth_025)(StaffControllerImpl*);
+					void(__fastcall* meth_026)(StaffControllerImpl*);
+					void(__fastcall* meth_027)(StaffControllerImpl*);
+					void(__fastcall* meth_028)(StaffControllerImpl*);
+					void(__fastcall* meth_029)(StaffControllerImpl*);
+					void(__fastcall* meth_030)(StaffControllerImpl*);
+					void(__fastcall* meth_031)(StaffControllerImpl*);
+					void(__fastcall* meth_032)(StaffControllerImpl*);
+					void(__fastcall* meth_033)(StaffControllerImpl*);
+					void(__fastcall* meth_034)(StaffControllerImpl*);
+					void(__fastcall* meth_035)(StaffControllerImpl*);
+					void(__fastcall* meth_036)(StaffControllerImpl*);
+					void(__fastcall* meth_037)(StaffControllerImpl*);
+					void(__fastcall* meth_038)(StaffControllerImpl*);
+					void(__fastcall* meth_039)(StaffControllerImpl*);
+					void(__fastcall* meth_040)(StaffControllerImpl*);
+					void(__fastcall* meth_041)(StaffControllerImpl*);
+					void(__fastcall* meth_042)(StaffControllerImpl*);
+					void(__fastcall* meth_043)(StaffControllerImpl*);
+					void(__fastcall* meth_044)(StaffControllerImpl*);
+					void(__fastcall* meth_045)(StaffControllerImpl*);
+					void(__fastcall* meth_046)(StaffControllerImpl*);
+					void(__fastcall* meth_047)(StaffControllerImpl*);
+					void(__fastcall* meth_048)(StaffControllerImpl*);
+					void(__fastcall* meth_049)(StaffControllerImpl*);
+					void(__fastcall* meth_050)(StaffControllerImpl*);
+					void(__fastcall* meth_051)(StaffControllerImpl*);
+					void(__fastcall* meth_052)(StaffControllerImpl*);
+					void(__fastcall* meth_053)(StaffControllerImpl*);
+					void(__fastcall* meth_054)(StaffControllerImpl*);
+					void(__fastcall* meth_055)(StaffControllerImpl*);
+					void(__fastcall* meth_056)(StaffControllerImpl*);
+					void(__fastcall* meth_057)(StaffControllerImpl*);
+					void(__fastcall* meth_058)(StaffControllerImpl*);
+					void(__fastcall* meth_059)(StaffControllerImpl*);
+					void(__fastcall* meth_060)(StaffControllerImpl*);
+					void(__fastcall* meth_061)(StaffControllerImpl*);
+					void(__fastcall* meth_062)(StaffControllerImpl*);
+					void(__fastcall* meth_063)(StaffControllerImpl*);
+					void(__fastcall* meth_064)(StaffControllerImpl*);
+					void(__fastcall* meth_065)(StaffControllerImpl*);
+					void(__fastcall* meth_066)(StaffControllerImpl*);
+					void(__fastcall* meth_067)(StaffControllerImpl*);
+					void(__fastcall* meth_068)(StaffControllerImpl*);
+					void(__fastcall* meth_069)(StaffControllerImpl*);
+					void(__fastcall* meth_070)(StaffControllerImpl*);
+					void(__fastcall* meth_071)(StaffControllerImpl*);
+					void(__fastcall* meth_072)(StaffControllerImpl*);
+					void(__fastcall* meth_073)(StaffControllerImpl*);
+					void(__fastcall* meth_074)(StaffControllerImpl*);
+					void(__fastcall* meth_075)(StaffControllerImpl*);
+					void(__fastcall* meth_076)(StaffControllerImpl*);
+					void(__fastcall* meth_077)(StaffControllerImpl*);
+					void(__fastcall* meth_078)(StaffControllerImpl*);
+					void(__fastcall* meth_079)(StaffControllerImpl*);
+					void(__fastcall* meth_080)(StaffControllerImpl*);
+					void(__fastcall* meth_081)(StaffControllerImpl*);
+					void(__fastcall* meth_082)(StaffControllerImpl*);
+					void(__fastcall* meth_083)(StaffControllerImpl*);
+					void(__fastcall* meth_084)(StaffControllerImpl*);
+					void(__fastcall* meth_085)(StaffControllerImpl*);
+					void(__fastcall* meth_086)(StaffControllerImpl*);
+					void(__fastcall* meth_087)(StaffControllerImpl*);
+					void(__fastcall* meth_088)(StaffControllerImpl*);
+					void(__fastcall* meth_089)(StaffControllerImpl*);
+					void(__fastcall* meth_090)(StaffControllerImpl*);
+					void(__fastcall* meth_091)(StaffControllerImpl*);
+					void(__fastcall* meth_092)(StaffControllerImpl*);
+					void(__fastcall* meth_093)(StaffControllerImpl*);
+					void(__fastcall* meth_094)(StaffControllerImpl*);
+					void(__fastcall* meth_095)(StaffControllerImpl*);
+					void(__fastcall* meth_096)(StaffControllerImpl*);
+					void(__fastcall* meth_097)(StaffControllerImpl*);
+					void(__fastcall* meth_098)(StaffControllerImpl*);
+					void(__fastcall* meth_099)(StaffControllerImpl*);
+					void(__fastcall* meth_100)(StaffControllerImpl*);
+					void(__fastcall* meth_101)(StaffControllerImpl*);
+					void(__fastcall* meth_102)(StaffControllerImpl*);
+					void(__fastcall* meth_103)(StaffControllerImpl*);
+					void(__fastcall* meth_104)(StaffControllerImpl*);
+					void(__fastcall* meth_105)(StaffControllerImpl*);
+					void(__fastcall* meth_106)(StaffControllerImpl*);
+					void(__fastcall* meth_107)(StaffControllerImpl*);
+					void(__fastcall* meth_108)(StaffControllerImpl*);
+					void(__fastcall* meth_109)(StaffControllerImpl*);
+					void(__fastcall* meth_110)(StaffControllerImpl*);
+					void(__fastcall* meth_111)(StaffControllerImpl*);
+					void(__fastcall* meth_112)(StaffControllerImpl*);
+					void(__fastcall* meth_113)(StaffControllerImpl*);
+					void(__fastcall* meth_114)(StaffControllerImpl*);
+					void(__fastcall* meth_115)(StaffControllerImpl*);
+					void(__fastcall* meth_116)(StaffControllerImpl*);
+					void(__fastcall* meth_117)(StaffControllerImpl*);
+					void(__fastcall* meth_118)(StaffControllerImpl*);
+					void(__fastcall* meth_119)(StaffControllerImpl*);
+					void(__fastcall* meth_120)(StaffControllerImpl*);
+					void(__fastcall* meth_121)(StaffControllerImpl*);
+					void(__fastcall* meth_122)(StaffControllerImpl*);
+					void(__fastcall* meth_123)(StaffControllerImpl*);
+					void(__fastcall* meth_124)(StaffControllerImpl*);
+					void(__fastcall* meth_125)(StaffControllerImpl*);
+					void(__fastcall* meth_126)(StaffControllerImpl*);
+					void(__fastcall* meth_127)(StaffControllerImpl*);
+					void(__fastcall* meth_128)(StaffControllerImpl*);
+					void(__fastcall* meth_129)(StaffControllerImpl*);
+					void(__fastcall* meth_130)(StaffControllerImpl*);
+					void(__fastcall* meth_131)(StaffControllerImpl*);
+					void(__fastcall* meth_132)(StaffControllerImpl*);
+					void(__fastcall* meth_133)(StaffControllerImpl*);
+					void(__fastcall* meth_134)(StaffControllerImpl*);
+					void(__fastcall* meth_135)(StaffControllerImpl*);
+					void(__fastcall* meth_136)(StaffControllerImpl*);
+					void(__fastcall* meth_137)(StaffControllerImpl*);
+					void(__fastcall* meth_138)(StaffControllerImpl*);
+					void(__fastcall* meth_139)(StaffControllerImpl*);
+					void(__fastcall* meth_140)(StaffControllerImpl*);
+					bool(__fastcall* CanFobStaff)(StaffControllerImpl*, StaffHeader, StaffSeed, StaffStatusSync, StaffStatusNoSync);
+					void(__fastcall* meth_142)(StaffControllerImpl*);
+					void(__fastcall* meth_143)(StaffControllerImpl*);
+					void(__fastcall* meth_144)(StaffControllerImpl*);
+					void(__fastcall* meth_145)(StaffControllerImpl*);
+					void(__fastcall* meth_146)(StaffControllerImpl*);
+					void(__fastcall* meth_147)(StaffControllerImpl*);
+					void(__fastcall* meth_148)(StaffControllerImpl*);
+					void(__fastcall* meth_149)(StaffControllerImpl*);
+					void(__fastcall* meth_150)(StaffControllerImpl*);
+					void(__fastcall* meth_151)(StaffControllerImpl*);
+					void(__fastcall* meth_152)(StaffControllerImpl*);
+					void(__fastcall* meth_153)(StaffControllerImpl*);
+					void(__fastcall* meth_154)(StaffControllerImpl*);
+					void(__fastcall* meth_155)(StaffControllerImpl*);
+					void(__fastcall* meth_156)(StaffControllerImpl*);
+					void(__fastcall* meth_157)(StaffControllerImpl*);
+					void(__fastcall* meth_158)(StaffControllerImpl*);
+					void(__fastcall* meth_159)(StaffControllerImpl*);
+					void(__fastcall* meth_160)(StaffControllerImpl*);
+					void(__fastcall* meth_161)(StaffControllerImpl*);
+					void(__fastcall* meth_162)(StaffControllerImpl*);
+					void(__fastcall* meth_163)(StaffControllerImpl*);
+					void(__fastcall* meth_164)(StaffControllerImpl*);
+					void(__fastcall* meth_165)(StaffControllerImpl*);
+					void(__fastcall* meth_166)(StaffControllerImpl*);
+					void(__fastcall* meth_167)(StaffControllerImpl*);
+					void(__fastcall* meth_168)(StaffControllerImpl*);
+					void(__fastcall* meth_169)(StaffControllerImpl*);
+					void(__fastcall* meth_170)(StaffControllerImpl*);
+					void(__fastcall* meth_171)(StaffControllerImpl*);
+					void(__fastcall* meth_172)(StaffControllerImpl*);
+					void(__fastcall* meth_173)(StaffControllerImpl*);
+					void(__fastcall* meth_174)(StaffControllerImpl*);
+					void(__fastcall* meth_175)(StaffControllerImpl*);
+					void(__fastcall* meth_176)(StaffControllerImpl*);
+					void(__fastcall* meth_177)(StaffControllerImpl*);
+					void(__fastcall* meth_178)(StaffControllerImpl*);
+					void(__fastcall* meth_179)(StaffControllerImpl*);
+					void(__fastcall* meth_180)(StaffControllerImpl*);
+					void(__fastcall* meth_181)(StaffControllerImpl*);
+					void(__fastcall* meth_182)(StaffControllerImpl*);
+					void(__fastcall* meth_183)(StaffControllerImpl*);
+					void(__fastcall* meth_184)(StaffControllerImpl*);
+					void(__fastcall* meth_185)(StaffControllerImpl*);
+					void(__fastcall* meth_186)(StaffControllerImpl*);
+					void(__fastcall* meth_187)(StaffControllerImpl*);
+					void(__fastcall* meth_188)(StaffControllerImpl*);
+					void(__fastcall* meth_189)(StaffControllerImpl*);
+					void(__fastcall* meth_190)(StaffControllerImpl*);
+					void(__fastcall* meth_191)(StaffControllerImpl*);
+					void(__fastcall* meth_192)(StaffControllerImpl*);
+					void(__fastcall* meth_193)(StaffControllerImpl*);
+					void(__fastcall* meth_194)(StaffControllerImpl*);
+					void(__fastcall* meth_195)(StaffControllerImpl*);
+					void(__fastcall* meth_196)(StaffControllerImpl*);
+					void(__fastcall* meth_197)(StaffControllerImpl*);
+					void(__fastcall* meth_198)(StaffControllerImpl*);
+					void(__fastcall* meth_199)(StaffControllerImpl*);
+					void(__fastcall* meth_200)(StaffControllerImpl*);
+					void(__fastcall* meth_201)(StaffControllerImpl*);
+					void(__fastcall* meth_202)(StaffControllerImpl*);
+					void(__fastcall* meth_203)(StaffControllerImpl*);
+					void(__fastcall* meth_204)(StaffControllerImpl*);
+					void(__fastcall* meth_205)(StaffControllerImpl*);
+					void(__fastcall* meth_206)(StaffControllerImpl*);
+					void(__fastcall* meth_207)(StaffControllerImpl*);
+					void(__fastcall* meth_208)(StaffControllerImpl*);
+					void(__fastcall* meth_209)(StaffControllerImpl*);
+					void(__fastcall* meth_210)(StaffControllerImpl*);
+					void(__fastcall* meth_211)(StaffControllerImpl*);
+					void(__fastcall* meth_212)(StaffControllerImpl*);
+					void(__fastcall* meth_213)(StaffControllerImpl*);
+					void(__fastcall* meth_214)(StaffControllerImpl*);
+					void(__fastcall* meth_215)(StaffControllerImpl*);
+					void(__fastcall* meth_216)(StaffControllerImpl*);
+					void(__fastcall* meth_217)(StaffControllerImpl*);
+					void(__fastcall* meth_218)(StaffControllerImpl*);
+					void(__fastcall* meth_219)(StaffControllerImpl*);
+					void(__fastcall* meth_220)(StaffControllerImpl*);
+					void(__fastcall* meth_221)(StaffControllerImpl*);
+					void(__fastcall* meth_222)(StaffControllerImpl*);
+					void(__fastcall* meth_223)(StaffControllerImpl*);
+					void(__fastcall* meth_224)(StaffControllerImpl*);
+					void(__fastcall* meth_225)(StaffControllerImpl*);
+					void(__fastcall* meth_226)(StaffControllerImpl*);
+					void(__fastcall* meth_227)(StaffControllerImpl*);
+					void(__fastcall* meth_228)(StaffControllerImpl*);
+					void(__fastcall* meth_229)(StaffControllerImpl*);
+					void(__fastcall* meth_230)(StaffControllerImpl*);
+					void(__fastcall* meth_231)(StaffControllerImpl*);
+					void(__fastcall* meth_232)(StaffControllerImpl*);
+					void(__fastcall* meth_233)(StaffControllerImpl*);
+					void(__fastcall* meth_234)(StaffControllerImpl*);
+					void(__fastcall* meth_235)(StaffControllerImpl*);
+					void(__fastcall* meth_236)(StaffControllerImpl*);
+					void(__fastcall* meth_237)(StaffControllerImpl*);
+					void(__fastcall* meth_238)(StaffControllerImpl*);
+					void(__fastcall* meth_239)(StaffControllerImpl*);
+					void(__fastcall* meth_240)(StaffControllerImpl*);
+					void(__fastcall* meth_241)(StaffControllerImpl*);
+					void(__fastcall* meth_242)(StaffControllerImpl*);
+					void(__fastcall* meth_243)(StaffControllerImpl*);
+					void(__fastcall* meth_244)(StaffControllerImpl*);
+					void(__fastcall* meth_245)(StaffControllerImpl*);
+					void(__fastcall* meth_246)(StaffControllerImpl*);
+					void(__fastcall* meth_247)(StaffControllerImpl*);
+					void(__fastcall* meth_248)(StaffControllerImpl*);
+					void(__fastcall* meth_249)(StaffControllerImpl*);
+					void(__fastcall* meth_250)(StaffControllerImpl*);
+					void(__fastcall* meth_251)(StaffControllerImpl*);
+					void(__fastcall* meth_252)(StaffControllerImpl*);
+					void(__fastcall* meth_253)(StaffControllerImpl*);
+					void(__fastcall* meth_254)(StaffControllerImpl*);
+					void(__fastcall* meth_255)(StaffControllerImpl*);
 				};
 
 				vtable* __vftable;
 				char __pad0[40048];
-				StaffHeader* staffHeader;
-				unsigned int* s2;
-				StaffStatusSync* staffStatusSync;
-				char __pad1[400];
-				unsigned int* s4;
-				unsigned int* s5;
-				unsigned int* s6;
+				StaffHeader* mbmStaffSvarsHeaders;
+				StaffSeed* mbmStaffSvarsSeeds;
+				StaffStatusSync* mbmStaffSvarsStatusesSync;
+				StaffStatusNoSync* mbmStaffSvarsStatusesNoSync;
+				char __pad1[392];
+				StaffHeader* mbmRemoverSvarsHeaders;
+				StaffSeed* mbmRemoverSvarsSeeds;
+				StaffStatusSync* mbmRemoverSvarsStatusesSync;
+				StaffStatusNoSync* mbmRemoverSvarsStatusesNoSync;
+				char __pad2[44];
+				short staffCount;
+				char __pad3[4];
+				__int16 sectionCounts[7];
+				char __pad4[474];
+				unsigned __int8 sectionLevels[7];
 			};
 
-			static_assert(offsetof(StaffController, staffHeader) == 0x9C78);
-			static_assert(offsetof(StaffController, staffStatusSync) == 0x9C88);
+			static_assert(offsetof(StaffControllerImpl, mbmStaffSvarsHeaders) == 0x9C78);
+			static_assert(offsetof(StaffControllerImpl, mbmStaffSvarsStatusesSync) == 0x9C88);
+
+			struct ResourceControllerImpl
+			{
+				struct UsableResource
+				{
+					std::uint32_t sign : 1;
+					std::uint32_t count : 20;
+					std::uint32_t unk : 11;
+				};
+
+				struct ProcessingResource
+				{
+					std::uint32_t unk1 : 3;
+					std::uint32_t count : 20;
+					std::uint32_t unk2 : 11;
+				};
+
+				struct vtable
+				{
+					void(__fastcall* meth_01)(tpp::mbm::impl::ResourceControllerImpl*);
+					void(__fastcall* meth_02)(tpp::mbm::impl::ResourceControllerImpl*);
+					void(__fastcall* meth_03)(tpp::mbm::impl::ResourceControllerImpl*);
+					void(__fastcall* meth_04)(tpp::mbm::impl::ResourceControllerImpl*);
+					void(__fastcall* AddResource)(tpp::mbm::impl::ResourceControllerImpl*, unsigned char, int, char, bool, bool, bool);
+					void(__fastcall* meth_06)(tpp::mbm::impl::ResourceControllerImpl*);
+					void(__fastcall* meth_07)(tpp::mbm::impl::ResourceControllerImpl*);
+					void(__fastcall* meth_08)(tpp::mbm::impl::ResourceControllerImpl*);
+					void(__fastcall* meth_09)(tpp::mbm::impl::ResourceControllerImpl*);
+					void(__fastcall* meth_10)(tpp::mbm::impl::ResourceControllerImpl*);
+					void(__fastcall* meth_11)(tpp::mbm::impl::ResourceControllerImpl*);
+					void(__fastcall* meth_12)(tpp::mbm::impl::ResourceControllerImpl*);
+					void(__fastcall* meth_13)(tpp::mbm::impl::ResourceControllerImpl*);
+					void(__fastcall* meth_14)(tpp::mbm::impl::ResourceControllerImpl*);
+					void(__fastcall* meth_15)(tpp::mbm::impl::ResourceControllerImpl*);
+					void(__fastcall* meth_16)(tpp::mbm::impl::ResourceControllerImpl*);
+					void(__fastcall* meth_17)(tpp::mbm::impl::ResourceControllerImpl*);
+					void(__fastcall* meth_18)(tpp::mbm::impl::ResourceControllerImpl*);
+					void(__fastcall* meth_19)(tpp::mbm::impl::ResourceControllerImpl*);
+					void(__fastcall* meth_20)(tpp::mbm::impl::ResourceControllerImpl*);
+					void(__fastcall* meth_21)(tpp::mbm::impl::ResourceControllerImpl*);
+					void(__fastcall* meth_22)(tpp::mbm::impl::ResourceControllerImpl*);
+					void(__fastcall* meth_23)(tpp::mbm::impl::ResourceControllerImpl*);
+					void(__fastcall* meth_24)(tpp::mbm::impl::ResourceControllerImpl*);
+					void(__fastcall* meth_25)(tpp::mbm::impl::ResourceControllerImpl*);
+					void(__fastcall* meth_26)(tpp::mbm::impl::ResourceControllerImpl*);
+					void(__fastcall* meth_27)(tpp::mbm::impl::ResourceControllerImpl*);
+					void(__fastcall* meth_28)(tpp::mbm::impl::ResourceControllerImpl*);
+					void(__fastcall* meth_29)(tpp::mbm::impl::ResourceControllerImpl*);
+					void(__fastcall* meth_30)(tpp::mbm::impl::ResourceControllerImpl*);
+					void(__fastcall* meth_31)(tpp::mbm::impl::ResourceControllerImpl*);
+					void(__fastcall* meth_32)(tpp::mbm::impl::ResourceControllerImpl*);
+					void(__fastcall* meth_33)(tpp::mbm::impl::ResourceControllerImpl*);
+					void(__fastcall* meth_34)(tpp::mbm::impl::ResourceControllerImpl*);
+					void(__fastcall* meth_35)(tpp::mbm::impl::ResourceControllerImpl*);
+					void(__fastcall* meth_36)(tpp::mbm::impl::ResourceControllerImpl*);
+					void(__fastcall* meth_37)(tpp::mbm::impl::ResourceControllerImpl*);
+					void(__fastcall* meth_38)(tpp::mbm::impl::ResourceControllerImpl*);
+					void(__fastcall* meth_39)(tpp::mbm::impl::ResourceControllerImpl*);
+					void(__fastcall* meth_40)(tpp::mbm::impl::ResourceControllerImpl*);
+					void(__fastcall* meth_41)(tpp::mbm::impl::ResourceControllerImpl*);
+					void(__fastcall* meth_42)(tpp::mbm::impl::ResourceControllerImpl*);
+					void(__fastcall* meth_43)(tpp::mbm::impl::ResourceControllerImpl*);
+					void(__fastcall* meth_44)(tpp::mbm::impl::ResourceControllerImpl*);
+					void(__fastcall* meth_45)(tpp::mbm::impl::ResourceControllerImpl*);
+					void(__fastcall* meth_46)(tpp::mbm::impl::ResourceControllerImpl*);
+					void(__fastcall* meth_47)(tpp::mbm::impl::ResourceControllerImpl*);
+					void(__fastcall* meth_48)(tpp::mbm::impl::ResourceControllerImpl*);
+					void(__fastcall* meth_49)(tpp::mbm::impl::ResourceControllerImpl*);
+					void(__fastcall* meth_50)(tpp::mbm::impl::ResourceControllerImpl*);
+				};
+
+				vtable* __vftable;
+				char __pad0[4584];
+				UsableResource* usableResource;
+				ProcessingResource* processingResource;
+			};
 
 			struct MotherBaseManagementSystemImpl
 			{
@@ -2486,15 +2829,17 @@ namespace game
 					void(__fastcall* meth_01)(tpp::mbm::impl::MotherBaseManagementSystemImpl*);
 					void(__fastcall* meth_02)(tpp::mbm::impl::MotherBaseManagementSystemImpl*);
 					void(__fastcall* meth_03)(tpp::mbm::impl::MotherBaseManagementSystemImpl*);
+					void(__fastcall* meth_04)(tpp::mbm::impl::MotherBaseManagementSystemImpl*);
 					void(__fastcall* meth_05)(tpp::mbm::impl::MotherBaseManagementSystemImpl*);
 					void(__fastcall* meth_06)(tpp::mbm::impl::MotherBaseManagementSystemImpl*);
-					void(__fastcall* meth_07)(tpp::mbm::impl::MotherBaseManagementSystemImpl*);
 					void(__fastcall* AddTppGmp)(tpp::mbm::impl::MotherBaseManagementSystemImpl*, unsigned int);
 					void(__fastcall* SubTppGmp)(tpp::mbm::impl::MotherBaseManagementSystemImpl*, unsigned int);
+					void(__fastcall* meth_09)(tpp::mbm::impl::MotherBaseManagementSystemImpl*);
 					void(__fastcall* meth_10)(tpp::mbm::impl::MotherBaseManagementSystemImpl*);
 					void(__fastcall* meth_11)(tpp::mbm::impl::MotherBaseManagementSystemImpl*);
 					void(__fastcall* meth_12)(tpp::mbm::impl::MotherBaseManagementSystemImpl*);
 					void(__fastcall* meth_13)(tpp::mbm::impl::MotherBaseManagementSystemImpl*);
+					void(__fastcall* meth_14)(tpp::mbm::impl::MotherBaseManagementSystemImpl*);
 					void(__fastcall* meth_15)(tpp::mbm::impl::MotherBaseManagementSystemImpl*);
 					void(__fastcall* meth_16)(tpp::mbm::impl::MotherBaseManagementSystemImpl*);
 					void(__fastcall* meth_17)(tpp::mbm::impl::MotherBaseManagementSystemImpl*);
@@ -2504,6 +2849,7 @@ namespace game
 					void(__fastcall* meth_21)(tpp::mbm::impl::MotherBaseManagementSystemImpl*);
 					void(__fastcall* meth_22)(tpp::mbm::impl::MotherBaseManagementSystemImpl*);
 					void(__fastcall* meth_23)(tpp::mbm::impl::MotherBaseManagementSystemImpl*);
+					void(__fastcall* meth_24)(tpp::mbm::impl::MotherBaseManagementSystemImpl*);
 					void(__fastcall* meth_25)(tpp::mbm::impl::MotherBaseManagementSystemImpl*);
 					void(__fastcall* meth_26)(tpp::mbm::impl::MotherBaseManagementSystemImpl*);
 					void(__fastcall* meth_27)(tpp::mbm::impl::MotherBaseManagementSystemImpl*);
@@ -2513,6 +2859,7 @@ namespace game
 					void(__fastcall* meth_31)(tpp::mbm::impl::MotherBaseManagementSystemImpl*);
 					void(__fastcall* meth_32)(tpp::mbm::impl::MotherBaseManagementSystemImpl*);
 					void(__fastcall* meth_33)(tpp::mbm::impl::MotherBaseManagementSystemImpl*);
+					void(__fastcall* meth_34)(tpp::mbm::impl::MotherBaseManagementSystemImpl*);
 					void(__fastcall* meth_35)(tpp::mbm::impl::MotherBaseManagementSystemImpl*);
 					void(__fastcall* meth_36)(tpp::mbm::impl::MotherBaseManagementSystemImpl*);
 					void(__fastcall* meth_37)(tpp::mbm::impl::MotherBaseManagementSystemImpl*);
@@ -2522,33 +2869,30 @@ namespace game
 					void(__fastcall* meth_41)(tpp::mbm::impl::MotherBaseManagementSystemImpl*);
 					void(__fastcall* meth_42)(tpp::mbm::impl::MotherBaseManagementSystemImpl*);
 					void(__fastcall* meth_43)(tpp::mbm::impl::MotherBaseManagementSystemImpl*);
+					void(__fastcall* meth_44)(tpp::mbm::impl::MotherBaseManagementSystemImpl*);
 					void(__fastcall* meth_45)(tpp::mbm::impl::MotherBaseManagementSystemImpl*);
-					void(__fastcall* meth_46)(tpp::mbm::impl::MotherBaseManagementSystemImpl*);
+					void(__fastcall* ReflectHeroicPointDiffToSvars)(tpp::mbm::impl::MotherBaseManagementSystemImpl*, int);
 					void(__fastcall* meth_47)(tpp::mbm::impl::MotherBaseManagementSystemImpl*);
 					void(__fastcall* meth_48)(tpp::mbm::impl::MotherBaseManagementSystemImpl*);
 					void(__fastcall* meth_49)(tpp::mbm::impl::MotherBaseManagementSystemImpl*);
 					void(__fastcall* meth_50)(tpp::mbm::impl::MotherBaseManagementSystemImpl*);
-					void(__fastcall* ReflectHeroicPointDiffToSvars)(tpp::mbm::impl::MotherBaseManagementSystemImpl*, int);
-					void(__fastcall* meth_52)(tpp::mbm::impl::MotherBaseManagementSystemImpl*);
-					void(__fastcall* meth_53)(tpp::mbm::impl::MotherBaseManagementSystemImpl*);
-					void(__fastcall* meth_54)(tpp::mbm::impl::MotherBaseManagementSystemImpl*);
-					void(__fastcall* meth_55)(tpp::mbm::impl::MotherBaseManagementSystemImpl*);
 				};
 
 				vtable* __vftable;
 				char __pad0[2584];
-				int* heroicPoint1;
-				int* heroicPoint2;
-				int* ogrePoint1;
-				int* ogrePoint2;
+				int* heroicPoint;
+				int* heroicPointDiff;
+				int* ogrePoint;
+				int* ogrePointDiff;
 				char __pad2[128];
-				StaffController* staffController;
-				char __pad3[100];
+				StaffControllerImpl* staffController;
+				char __pad3[24];
+				ResourceControllerImpl* resourceController;
 			};
 
 			static_assert(offsetof(MotherBaseManagementSystemImpl, staffController) == 2752);
-			static_assert(offsetof(MotherBaseManagementSystemImpl, heroicPoint2) == 2600);
-			static_assert(offsetof(MotherBaseManagementSystemImpl, ogrePoint2) == 2616);
+			static_assert(offsetof(MotherBaseManagementSystemImpl, heroicPointDiff) == 2600);
+			static_assert(offsetof(MotherBaseManagementSystemImpl, ogrePoint) == 0xA30);
 		}
 	}
 
@@ -2972,7 +3316,7 @@ namespace game
 		struct CmdSyncSoldierBinOption
 		{
 			char __pad0[136];
-			mbm::impl::StaffController::Staff soldier_param[3500];
+			mbm::impl::StaffControllerImpl::Staff soldier_param[3500];
 			int soldier_num;
 		};
 

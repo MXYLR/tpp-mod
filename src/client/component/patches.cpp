@@ -22,10 +22,10 @@ namespace patches
 		vars::var_ptr var_name;
 		vars::var_ptr var_max_fps;
 		vars::var_ptr var_sensitivity;
-		vars::var_ptr var_camera_fov_scale;
-		vars::var_ptr var_camera_fist_person_fov_scale;
-		vars::var_ptr var_camera_fp_preserve;
 		vars::var_ptr var_sensitivity_patch;
+		vars::var_ptr var_camera_fovscale;
+		vars::var_ptr var_camera_fp_fovscale;
+		vars::var_ptr var_camera_fp_preserve;
 
 		void set_timer_resolution()
 		{
@@ -440,17 +440,6 @@ namespace patches
 			utils::hook::jump(SELECT_VALUE_LANG(0x1407A7C10, 0x1407A7A80), utils::hook::assemble(sub_1407A7F70_stub), true);
 			fv2_resource_manager_get_model_hook.create(SELECT_VALUE_LANG(0x14029FE80, 0x1436E73F0), fv2_resource_manager_get_model_stub);
 		}
-
-		utils::hook::detour get_friend_count_hook;
-		int get_friend_count_stub(game::ISteamFriends* this_, int eFriendFlags)
-		{
-			auto count = get_friend_count_hook.invoke<int>(this_, eFriendFlags);
-			if (count > 50)
-			{
-				count = 50;
-			}
-			return count;
-		}
 	}
 
 	class component final : public component_interface
@@ -488,9 +477,6 @@ namespace patches
 
 			var_camera_fp_preserve = vars::register_bool("camera_fp_preserve", false, 
 				vars::var_flag_saved, "preserve first person camera mode after leaving ADS");
-
-			var_sensitivity_patch = vars::register_bool("sensitivity_fps_patch", false, 
-				vars::var_flag_saved, "enable sensitivity scaling patch");
 
 			if (game::environment::is_tpp())
 			{
@@ -540,17 +526,8 @@ namespace patches
 
 				get_ramble_speed_hook.create(SELECT_VALUE_LANG(0x140AFD550, 0x1484C25F0), get_ramble_speed_stub);
 
-				utils::hook::nop(SELECT_VALUE_LANG(0x144D21F3E, 0x144B8861D), 6);
-				utils::hook::call(SELECT_VALUE_LANG(0x144D21F3E, 0x144B8861D), strncpy_s_stub);
-
-				scheduler::once([]
-				{
-					const auto steam_friends = (*game::SteamFriends)();
-					if (steam_friends != nullptr)
-					{
-						get_friend_count_hook.create(steam_friends->__vftable->GetFriendCount, get_friend_count_stub);
-					}
-				}, scheduler::main);
+				utils::hook::nop(SELECT_VALUE_LANG(0x1405597A1, 0x144B8861D), 6);
+				utils::hook::call(SELECT_VALUE_LANG(0x1405597A1, 0x144B8861D), strncpy_s_stub);
 			}
 
 			utils::hook::nop(SELECT_VALUE(0x1400013F9, 0x1400014E9, 0x142E4F8E8, 0x142232258), 6);

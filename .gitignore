@@ -150,11 +150,3 @@ user*.bat
 #premake5.exe
 
 src/client/component/experiments/*
-
-# External projects (not part of the client mod)
-mgsv-client-tools/
-tpp-server-emulator/
-
-# Runtime dump files
-server_dump/
-tpp-mod-crash-*/

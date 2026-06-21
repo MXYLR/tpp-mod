@@ -450,9 +450,7 @@ namespace matchmaking
 				}
 
 				set_match_setting(params.get(1), params.get_int(2));
-			},
-			"Set a match setting value by name",
-			"matchset <name> <value>");
+			});
 
 			command::add("matchsetrule", [](const command::params& params)
 			{
@@ -463,9 +461,7 @@ namespace matchmaking
 				}
 
 				set_match_rule(params.get(1), params.get_int(2));
-			},
-			"Set a match rule value by name",
-			"matchsetrule <name> <value>");
+			});
 
 			command::add("matchsetslot", [](const command::params& params)
 			{
@@ -476,16 +472,12 @@ namespace matchmaking
 				}
 
 				set_slot_field(params.get_int(1), params.get(2), params.get_int(3));
-			},
-			"Set a match slot field by index and name",
-			"matchsetslot <index> <name> <value>");
+			});
 
 			command::add("matchstart", [](const command::params& params)
 			{
 				request_match_start = true;
-			},
-			"Request match start",
-			"matchstart");
+			});
 		}
 
 		void start() override
@@ -508,9 +500,7 @@ namespace matchmaking
 					kicked_steam_ids.clear();
 					set_lobby_data("kick_num", 0);
 				}, scheduler::session);
-			},
-			"Clear the list of kicked players",
-			"clearkicks");
+			});
 
 			command::add("connect_lobby", [](const command::params& params)
 			{
@@ -526,16 +516,12 @@ namespace matchmaking
 				lobby_id.bits = std::strtoull(lobby_id_s.data(), nullptr, 0);
 
 				connect_to_lobby(lobby_id);
-			},
-			"Connect to a specific lobby by its Steam lobby ID",
-			"connect_lobby <lobby_id>");
+			});
 
 			command::add("disconnect", [](const command::params& params)
 			{
 				request_disconnect = true;
-			},
-			"Disconnect from the current match or lobby (MGO)",
-			"disconnect");
+			});
 
 			command::add("reconnect", [](const command::params& params)
 			{
@@ -551,9 +537,7 @@ namespace matchmaking
 				{
 					connect_to_lobby(lobby_id);
 				}, scheduler::main, 1s);
-			},
-			"Reconnect to the current lobby",
-			"reconnect");
+			});
 
 			command::add("matchrotate", [](const command::params& params)
 			{
@@ -577,17 +561,13 @@ namespace matchmaking
 
 					request_match_rotate = true;
 				}, scheduler::session, 500ms);
-			},
-			"Rotate to the next match in the lobby",
-			"matchrotate");
+			});
 
 			command::add("matchsetstate", [](const command::params& params)
 			{
 				const auto state = params.get_int(1);
 				game::s_mgoMatchMakingManager->state = state;
-			},
-			"Set the match state directly",
-			"matchsetstate <state>");
+			});
 
 			command::add("matchprint", []()
 			{
@@ -622,9 +602,7 @@ namespace matchmaking
 
 					console::info("\n");
 				}
-			},
-			"Print current match settings, rules, and slot configuration",
-			"matchprint");
+			});
 		}
 	};
 }
