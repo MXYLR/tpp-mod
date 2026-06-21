@@ -1,8 +1,12 @@
 # tpp-mod
 
+![GitHub release (latest by date)](https://img.shields.io/github/v/release/MXYLR/tpp-mod)
+![GitHub Downloads](https://img.shields.io/github/downloads/MXYLR/tpp-mod/total)
+
 Improvements and fixes for Metal Gear Solid V: The Phantom Pain
 
 bilibili:https://space.bilibili.com/27683704
+discord:https://discord.gg/hYfW9MEEGF
 
 ## Installation
 
@@ -15,8 +19,8 @@ tpp-mod only supports original steam releases (latest), any kind of modified or 
 | mgsvtpp.exe (jpn, 1.0.15.3) | 3A87F626732158890A07688D32A2523CD8EADA71 | ✔️ |
 | mgsvmgo.exe (jpn, 1.1.2.7) | D6ADF7685B0F0639B2A949D0E96A06E853DAEEB8 | ✔️ |
 
-- Download [dinput8.dll](https://github.com/MXYLR/tpp-mod/releases) from the release page and copy it to the game folder.
-- Download [fob-gui.exe](https://github.com/MXYLR/tpp-mod/releases) and place it in the game folder alongside dinput8.dll (optional, for the FOB GUI application).
+- Download the latest [dinput8.dll](https://github.com/MXYLR/tpp-mod/releases) from the release page and copy it to the game folder.
+- Download the latest [fob-gui.exe](https://github.com/MXYLR/tpp-mod/releases) and place it in the game folder alongside dinput8.dll (optional, for the FOB GUI application).
 
 Configuration files are stored in `%localappdata%\tpp-mod`
 
@@ -198,6 +202,8 @@ similar to cod dvars, can be set through the console or through the config files
 - `net_server_heartbeat`: backend server heartbeat interval
 
 **FOB Variables**
+- `fob_security_challenge_mode`: FOB security challenge mode override
+- `fob_custom_targets`: enable custom FOB target support (0/1)
 
 **Match Variables**
 - `match_enable_tweaks`: enable match settings tweaks (0/1)
