@@ -366,14 +366,16 @@ namespace vars
 		return var_cheat_enabled->current.enabled();
 	}
 
+	bool cheats_enabled()
+{
+	return true;
+}
+
 	void set_var(const var_ptr& var, const var_value& value, const var_source_t set_source)
 	{
 		if (!check_cheats(var, set_source))
 		{
-			if (post_initialization)
-			{
-				console::error("\"%s\" is cheat protected", var->name.data());
-			}
+			console::error("\"%s\" is cheat protected", var->name.data());
 			return;
 		}
 
@@ -742,8 +744,25 @@ namespace vars
 
 				const auto name = params.get(1);
 				const auto value = params.join(2);
-				set_var_from_string(name, value);
-			});
+
+				const auto var = find(name);
+				if (var == nullptr)
+				{
+					register_string(name, value, var_flag_external, "");
+				}
+				else
+				{
+					const auto parsed_value = var_value::parse(value, var->type);
+					if (!parsed_value.has_value())
+					{
+						return;
+					}
+
+					set_var(var, parsed_value.value(), var_source_external);
+				}
+			},
+			"Set a variable value (creates new variable if not found)",
+			"set <name> <value>");
 
 			command::add("reset", [](const command::params& params)
 			{
@@ -762,7 +781,9 @@ namespace vars
 				}
 
 				set_var(var, var->reset, vars::var_source_external);
-			});
+			},
+			"Reset a variable to its default value",
+			"reset <name>");
 
 			command::add("toggle", [](const command::params& params)
 			{
@@ -814,7 +835,9 @@ namespace vars
 					const auto current_str = var->current.to_string();
 					console::info("%s \"%s\"\n", var->name.data(), current_str.data());
 				}
-			});
+			},
+			"List all registered variables and their current values",
+			"var_list");
 		}
 
 		void post_load() override

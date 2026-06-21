@@ -320,5 +320,19 @@ project "client"
 
 	dependencies.imports()
 
+project "fob_gui_app"
+	kind "WindowedApp"
+	language "C++"
+
+	targetname "fob-gui"
+
+	files {"./src/fob_gui_app/**.cpp", "./src/fob_gui_app/**.hpp"}
+
+	includedirs {"./deps/imgui"}
+
+	links {"imgui"}
+
+	dependencies.imports()
+
 group "Dependencies"
 	dependencies.projects()

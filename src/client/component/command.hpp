@@ -25,16 +25,25 @@ namespace command
 	using callback = std::function<void(const params& args)>;
 	using callback_narg = std::function<void()>;
 
+	struct command_info
+	{
+		callback handler;
+		std::string description;
+		std::string usage;
+	};
+
 	void run_frame();
 
 	void execute(const std::string& cmd, bool sync = false);
-	void add(const std::string& name, const callback& cb);
-	void add(const std::string& name, const callback_narg& cb);
+	void add(const std::string& name, const callback& cb, 
+		const std::string& description = {}, const std::string& usage = {});
+	void add(const std::string& name, const callback_narg& cb,
+		const std::string& description = {}, const std::string& usage = {});
 
 	std::optional<std::string> find_command_name(const std::string& input);
 
 	std::vector<std::string> tokenize_string(const std::string& str);
 
-	std::unordered_map<std::string, callback>& get_commands();
+	std::unordered_map<std::string, command_info>& get_commands();
 	std::unordered_map<std::string, std::string>& get_aliases();
 }

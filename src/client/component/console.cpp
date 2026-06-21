@@ -9,6 +9,8 @@
 
 #include <utils/thread.hpp>
 #include <utils/string.hpp>
+#include <utils/io.hpp>
+#include <ctime>
 
 #define OUTPUT_HANDLE GetStdHandle(STD_OUTPUT_HANDLE)
 
@@ -20,6 +22,9 @@ namespace console
 	{
 		std::recursive_mutex print_mutex;
 
+		std::mutex callback_mutex;
+		std::vector<print_callback> print_callbacks;
+
 		struct
 		{
 			bool kill;
@@ -30,6 +35,8 @@ namespace console
 			std::deque<std::string> history;
 			std::int32_t history_index = -1;
 		} con{};
+
+		vars::var_ptr var_console_logging;
 
 		void set_cursor_pos(int x)
 		{
@@ -123,6 +130,25 @@ namespace console
 			if (type != con_type_debug)
 			{
 				game_console::print(message);
+			}
+
+			if (var_console_logging && var_console_logging->current.enabled())
+			{
+				const auto now = std::time(nullptr);
+				char time_buf[32] = {};
+				std::tm tm_buf = {};
+				localtime_s(&tm_buf, &now);
+				std::strftime(time_buf, sizeof(time_buf), "%Y-%m-%d %H:%M:%S", &tm_buf);
+				const auto log_line = std::string("[") + time_buf + "] " + message + "\n";
+				utils::io::write_file("tpp-mod/log/console.log", log_line, true);
+			}
+
+			{
+				std::lock_guard<std::mutex> cb_lock(callback_mutex);
+				for (const auto& cb : print_callbacks)
+				{
+					cb(type, message);
+				}
 			}
 
 			update();
@@ -368,6 +394,8 @@ namespace console
 			ShowWindow(GetConsoleWindow(), SW_SHOW);
 			SetConsoleTitle("TPP-Mod");
 
+			var_console_logging = vars::register_bool("console_log", false, vars::var_flag_saved, "save console log to file (tpp-mod/log/console.log)");
+
 			con.kill_event = CreateEvent(NULL, TRUE, FALSE, NULL);
 
 			con.thread = utils::thread::create_named_thread("Console", []()
@@ -432,6 +460,25 @@ namespace console
 			}
 		}
 	};
+
+	void add_print_callback(print_callback callback)
+	{
+		std::lock_guard<std::mutex> lock(callback_mutex);
+		print_callbacks.push_back(std::move(callback));
+	}
+
+	void remove_print_callback(const print_callback& callback)
+	{
+		std::lock_guard<std::mutex> lock(callback_mutex);
+		for (auto it = print_callbacks.begin(); it != print_callbacks.end(); ++it)
+		{
+			if (it->target<void(int, const std::string&)>() == callback.target<void(int, const std::string&)>())
+			{
+				print_callbacks.erase(it);
+				break;
+			}
+		}
+	}
 }
 
 REGISTER_COMPONENT(console::component)

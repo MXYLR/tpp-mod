@@ -164,7 +164,9 @@ namespace text_chat::lobby
 
 				const auto msg = params.join(1);
 				send_chat_message(msg, false);
-			});
+			},
+			"Send a chat message to all players",
+			"say <message>");
 
 			command::add("say_team", [](const command::params& params)
 			{
@@ -175,7 +177,9 @@ namespace text_chat::lobby
 
 				const auto msg = params.join(1);
 				send_chat_message(msg, true);
-			});
+			},
+			"Send a chat message to your team only",
+			"say_team <message>");
 		}
 	};
 }
