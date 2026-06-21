@@ -22,4 +22,8 @@ namespace utils::http
 		const headers& headers = {}, const std::function<void(size_t, size_t, size_t)>& callback = {}, const std::string& proxy = {});
 
 	std::future<std::optional<std::string>> get_data_async(const std::string& url, const headers& headers = {});
+	std::optional<std::string> post_data(const std::string& url, const std::string& body, 
+		const headers& headers = {});
+	std::future<std::optional<std::string>> post_data_async(const std::string& url, 
+		const std::string& body, const headers& headers = {});
 }

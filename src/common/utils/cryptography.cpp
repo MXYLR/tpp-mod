@@ -6,6 +6,12 @@
 #undef max
 using namespace std::string_literals;
 
+#ifdef _WIN32
+#define BSWAP32(x) _byteswap_ulong(x)
+#else
+#define BSWAP32(x) __builtin_bswap32(x)
+#endif
+
 /// http://www.opensource.apple.com/source/CommonCrypto/CommonCrypto-55010/Source/libtomcrypt/doc/libTomCryptDoc.pdf
 
 namespace utils::cryptography
@@ -713,7 +719,7 @@ namespace utils::cryptography
 
 	void blowfish::set_key(std::uint8_t* key, const size_t len)
 	{
-		auto j = 0;
+		auto j = 0ull;
 		for (auto i = 0u; i < this->n_ + 2; i++)
 		{
 			std::uint32_t data{};
@@ -767,7 +773,7 @@ namespace utils::cryptography
 		if (mod != 0)
 		{
 			const auto byte_count = 8 - mod;
-			for (auto i = 0; i < byte_count; i++)
+			for (auto i = 0ull; i < byte_count; i++)
 			{
 				data += static_cast<char>(byte_count);
 			}
@@ -780,13 +786,13 @@ namespace utils::cryptography
 			auto chunk_l = chunk.substr(0, 4);
 			auto chunk_r = chunk.substr(4, 4);
 
-			auto xl = static_cast<std::uint32_t>(_byteswap_ulong(*reinterpret_cast<std::uint32_t*>(chunk_l.data())));
-			auto xr = static_cast<std::uint32_t>(_byteswap_ulong(*reinterpret_cast<std::uint32_t*>(chunk_r.data())));
+			auto xl = static_cast<std::uint32_t>(BSWAP32(*reinterpret_cast<std::uint32_t*>(chunk_l.data())));
+			auto xr = static_cast<std::uint32_t>(BSWAP32(*reinterpret_cast<std::uint32_t*>(chunk_r.data())));
 
 			this->encrypt_single(xl, xr);
 
-			xl = _byteswap_ulong(xl);
-			xr = _byteswap_ulong(xr);
+			xl = BSWAP32(xl);
+			xr = BSWAP32(xr);
 
 			text.append(reinterpret_cast<char*>(&xl), 4);
 			text.append(reinterpret_cast<char*>(&xr), 4);
@@ -810,13 +816,13 @@ namespace utils::cryptography
 			auto chunk_l = chunk.substr(0, 4);
 			auto chunk_r = chunk.substr(4, 4);
 
-			auto xl = static_cast<std::uint32_t>(_byteswap_ulong(*reinterpret_cast<std::uint32_t*>(chunk_l.data())));
-			auto xr = static_cast<std::uint32_t>(_byteswap_ulong(*reinterpret_cast<std::uint32_t*>(chunk_r.data())));
+			auto xl = static_cast<std::uint32_t>(BSWAP32(*reinterpret_cast<std::uint32_t*>(chunk_l.data())));
+			auto xr = static_cast<std::uint32_t>(BSWAP32(*reinterpret_cast<std::uint32_t*>(chunk_r.data())));
 
 			this->decrypt_single(xl, xr);
 
-			xl = _byteswap_ulong(xl);
-			xr = _byteswap_ulong(xr);
+			xl = BSWAP32(xl);
+			xr = BSWAP32(xr);
 
 			text.append(reinterpret_cast<char*>(&xl), 4);
 			text.append(reinterpret_cast<char*>(&xr), 4);

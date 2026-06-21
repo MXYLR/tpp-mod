@@ -11,83 +11,18 @@
 #include <utils/hook.hpp>
 #include <utils/cryptography.hpp>
 
-namespace cheat
+namespace staff
 {
 	namespace
 	{
 		vars::var_ptr var_cheat_unlockall_gear;
 		vars::var_ptr var_cheat_unlockall_items;
 		vars::var_ptr var_cheat_disable_reporting;
-		vars::var_ptr var_cheat_develop_limit;
-		vars::var_ptr var_cheat_no_deployment_cost;
 
-		const char* resource_names[] =
+		void modify_stats_internal(game::tpp::mbm::impl::StaffController::StaffHeader* header,
+			game::tpp::mbm::impl::StaffController::StaffStatusSync* status, const std::uint32_t index)
 		{
-			"FUEL_RESOURCE",
-			"BIOTIC_RESOURCE",
-			"COMMON_METAL",
-			"MINOR_METAL",
-			"PRECIOUS_METAL",
-			"WORM_WOOD",
-			"BLACK_CARROT",
-			"GOLDEN_CRESCENT",
-			"TARRAGON",
-			"AFRICAN_PEACH",
-			"DIGITALIS_P",
-			"DIGITALIS_L",
-			"HAOMA",
-			"4WD_EAST",
-			"4WD_WEST",
-			"TRUCK_EAST",
-			"TRUCK_WEST",
-			"ARMORED_VEHICLE_EAST",
-			"ARMORED_VEHICLE_WEST",
-			"ARMORED_VEHICLE_EAST_ROCKET",
-			"WHEELED_ARMORED_VEHICLE_WEST",
-			"TANK_EAST",
-			"TANK_WEST",
-			"WALKER_GEAR_PROTO_HEUY",
-			"WALKER_GEAR_SOVIET_BATTLE",
-			"WALKER_GEAR_SOVIET_SUPPORT",
-			"WALKER_GEAR_CFA_BATTLE",
-			"WALKER_GEAR_CFA_SUPPORT",
-			"NUCLEAR_WEAPON",
-			"NUCLEAR_WASTE",
-			"PARASITE_FOG",
-			"PARASITE_CAMOFLA",
-			"PARASITE_CURING",
-			"PARASITE_RESERVE",
-			"EMPLACEMENT_GUN_EAST",
-			"EMPLACEMENT_GUN_WEST",
-			"MORTAR_NORMAL",
-			"ANTI_AIR_GATLING_GUN_EAST",
-			"ANTI_AIR_GATLING_GUN_WEST",
-			"CBOX_POSTER_1000",
-			"CBOX_POSTER_1001",
-			"CBOX_POSTER_1002",
-			"CBOX_POSTER_1003",
-			"CBOX_POSTER_1004",
-			"CBOX_POSTER_1005",
-			"CBOX_POSTER_1006",
-			"RESERVE_A",
-			"RESERVE_B",
-			"RESERVE_C",
-			"RESERVE_D",
-			"RESERVE_E",
-			"RESERVE_F",
-			"RESERVE_G",
-			"RESERVE_H",
-			"RESERVE_I",
-			"RESERVE_J",
-			"RESERVE_K",
-			"RESERVE_L",
-			"RESERVE_M",
-		};
-
-		void modify_stats_internal(game::tpp::mbm::impl::StaffControllerImpl::StaffHeader* header,
-			game::tpp::mbm::impl::StaffControllerImpl::StaffStatusSync* status, const std::uint32_t index)
-		{
-			header->fields.peak_rank = game::tpp::mbm::impl::StaffControllerImpl::RANK_SPP;
+			header->fields.peak_rank = game::tpp::mbm::impl::StaffController::RANK_SPP;
 			header->fields.stat_bonus = 3;
 			header->fields.suppress_stats = 0;
 
@@ -119,39 +54,39 @@ namespace cheat
 
 			switch (status->fields.designation)
 			{
-			case game::tpp::mbm::impl::StaffControllerImpl::DESIGNATION_COMBAT:
-			case game::tpp::mbm::impl::StaffControllerImpl::DESIGNATION_SECURITY:
-				header->fields.stat_distribution = game::tpp::mbm::impl::StaffControllerImpl::STAT_DIST_COMBAT_PLUS_AND_INTEL_PLUS;
+			case game::tpp::mbm::impl::StaffController::DESIGNATION_COMBAT:
+			case game::tpp::mbm::impl::StaffController::DESIGNATION_SECURITY:
+				header->fields.stat_distribution = game::tpp::mbm::impl::StaffController::STAT_DIST_COMBAT_PLUS_AND_INTEL_PLUS;
 				break;
-			case game::tpp::mbm::impl::StaffControllerImpl::DESIGNATION_RND:
-				header->fields.stat_distribution = game::tpp::mbm::impl::StaffControllerImpl::STAT_DIST_RND_PLUS_AND_BASE_DEV_PLUS;
+			case game::tpp::mbm::impl::StaffController::DESIGNATION_RND:
+				header->fields.stat_distribution = game::tpp::mbm::impl::StaffController::STAT_DIST_RND_PLUS_AND_BASE_DEV_PLUS;
 				break;
-			case game::tpp::mbm::impl::StaffControllerImpl::DESIGNATION_BASE_DEV:
-				header->fields.stat_distribution = game::tpp::mbm::impl::StaffControllerImpl::STAT_DIST_BASE_DEV_PLUS_AND_INTEL_PLUS;
+			case game::tpp::mbm::impl::StaffController::DESIGNATION_BASE_DEV:
+				header->fields.stat_distribution = game::tpp::mbm::impl::StaffController::STAT_DIST_BASE_DEV_PLUS_AND_INTEL_PLUS;
 				break;
-			case game::tpp::mbm::impl::StaffControllerImpl::DESIGNATION_SUPPORT:
-				header->fields.stat_distribution = game::tpp::mbm::impl::StaffControllerImpl::STAT_DIST_SUPPORT_PLUS_AND_COMBAT_PLUS;
+			case game::tpp::mbm::impl::StaffController::DESIGNATION_SUPPORT:
+				header->fields.stat_distribution = game::tpp::mbm::impl::StaffController::STAT_DIST_SUPPORT_PLUS_AND_COMBAT_PLUS;
 				break;
-			case game::tpp::mbm::impl::StaffControllerImpl::DESIGNATION_INTEL:
-				header->fields.stat_distribution = game::tpp::mbm::impl::StaffControllerImpl::STAT_DIST_INTEL_PLUS_AND_COMBAT_PLUS;
+			case game::tpp::mbm::impl::StaffController::DESIGNATION_INTEL:
+				header->fields.stat_distribution = game::tpp::mbm::impl::StaffController::STAT_DIST_INTEL_PLUS_AND_COMBAT_PLUS;
 				break;
-			case game::tpp::mbm::impl::StaffControllerImpl::DESIGNATION_MEDICAL:
-				header->fields.stat_distribution = game::tpp::mbm::impl::StaffControllerImpl::STAT_DIST_MEDICAL_PLUS_AND_COMBAT_PLUS;
+			case game::tpp::mbm::impl::StaffController::DESIGNATION_MEDICAL:
+				header->fields.stat_distribution = game::tpp::mbm::impl::StaffController::STAT_DIST_MEDICAL_PLUS_AND_COMBAT_PLUS;
 				break;
 			default:
-			case game::tpp::mbm::impl::StaffControllerImpl::DESIGNATION_BRIG:
-				status->fields.designation = game::tpp::mbm::impl::StaffControllerImpl::DESIGNATION_WAITING_ROOM_1;
+			case game::tpp::mbm::impl::StaffController::DESIGNATION_BRIG:
+				status->fields.designation = game::tpp::mbm::impl::StaffController::DESIGNATION_WAITING_ROOM_1;
 				break;
 			}
 		}
 
-		void modify_stats(game::tpp::mbm::impl::StaffControllerImpl::StaffHeader* header, game::tpp::mbm::impl::StaffControllerImpl::StaffStatusSync* status)
+		void modify_stats(game::tpp::mbm::impl::StaffController::StaffHeader* header, game::tpp::mbm::impl::StaffController::StaffStatusSync* status)
 		{
 			auto total_staff = 0;
 			for (auto i = 0; i < 3500; i++)
 			{
-				if (status[i].fields.designation >= game::tpp::mbm::impl::StaffControllerImpl::DESIGNATION_UNITS_START &&
-					status[i].fields.designation < game::tpp::mbm::impl::StaffControllerImpl::DESIGNATION_COUNT)
+				if (status[i].fields.designation >= game::tpp::mbm::impl::StaffController::DESIGNATION_UNITS_START &&
+					status[i].fields.designation < game::tpp::mbm::impl::StaffController::DESIGNATION_COUNT)
 				{
 					++total_staff;
 					modify_stats_internal(&header[i], &status[i], i);
@@ -160,10 +95,10 @@ namespace cheat
 
 			static std::vector<std::uint32_t> required_skills =
 			{
-				{game::tpp::mbm::impl::StaffControllerImpl::SKILL_RANGER_3},
-				{game::tpp::mbm::impl::StaffControllerImpl::SKILL_SENTRY_3},
-				{game::tpp::mbm::impl::StaffControllerImpl::SKILL_DEFENDER_3},
-				{game::tpp::mbm::impl::StaffControllerImpl::SKILL_MEDIC_3},
+				{game::tpp::mbm::impl::StaffController::SKILL_RANGER_3},
+				{game::tpp::mbm::impl::StaffController::SKILL_SENTRY_3},
+				{game::tpp::mbm::impl::StaffController::SKILL_DEFENDER_3},
+				{game::tpp::mbm::impl::StaffController::SKILL_MEDIC_3},
 			};
 
 			const auto staff_per_skill = total_staff / required_skills.size();
@@ -173,8 +108,8 @@ namespace cheat
 
 			for (auto i = 0; i < 3500; i++)
 			{
-				if (status[i].fields.designation >= game::tpp::mbm::impl::StaffControllerImpl::DESIGNATION_UNITS_START && 
-					status[i].fields.designation <= game::tpp::mbm::impl::StaffControllerImpl::DESIGNATION_UNITS_END)
+				if (status[i].fields.designation >= game::tpp::mbm::impl::StaffController::DESIGNATION_UNITS_START && 
+					status[i].fields.designation <= game::tpp::mbm::impl::StaffController::DESIGNATION_UNITS_END)
 				{
 					header[i].fields.skill = required_skills[current_skill];
 
@@ -226,8 +161,8 @@ namespace cheat
 			}
 
 			modify_stats(
-				mb_sys->staffController->mbmStaffSvarsHeaders,
-				mb_sys->staffController->mbmStaffSvarsStatusesSync);
+				mb_sys->staffController->staffHeader,
+				mb_sys->staffController->staffStatusSync);
 		}
 
 		bool unlockall_items_enabled()
@@ -260,7 +195,7 @@ namespace cheat
 			a.bind(continue_);
 			a.pop(rax);
 			a.cmp(eax, 0x80);
-			a.jmp(SELECT_VALUE_LANG(0x140598B15, 0x140598325));
+			a.jmp(SELECT_VALUE_LANG(0x140598945, 0x140598325));
 		}
 
 		void cmd_get_server_item_list_result_unpack_stub(utils::hook::assembler& a)
@@ -293,34 +228,7 @@ namespace cheat
 			a.jmp(continue_);
 
 			a.bind(continue_);
-			a.jmp(SELECT_VALUE_LANG(0x140834214, 0x1408331E4));
-		}
-
-		int get_develop_limit()
-		{
-			return var_cheat_develop_limit->current.get_int();
-		}
-
-		void cmd_get_server_item_list_result_unpack_stub2(utils::hook::assembler& a)
-		{
-			a.call(SELECT_VALUE_LANG(0x141A0B6C0, 0x141A0BA10));
-			a.mov(rcx, rax);
-			a.call(SELECT_VALUE_LANG(0x141A0BC90, 0x141A0BFE0));
-
-			a.push(eax);
-			a.push(rcx);
-			a.pushad64();
-			a.call_aligned(get_develop_limit);
-			a.mov(qword_ptr(rsp, 0x80), rax);
-			a.popad64();
-			a.pop(rcx);
-			a.pop(eax);
-
-			a.test(ecx, ecx);
-			a.cmovnz(eax, ecx);
-
-			a.mov(dword_ptr(rsi, 0x2860), eax);
-			a.jmp(SELECT_VALUE_LANG(0x14083428F, 0x14083325F));
+			a.jmp(SELECT_VALUE_LANG(0x1408335B4, 0x1408331E4));
 		}
 
 		utils::hook::detour cmd_check_server_item_correct_hook;
@@ -344,90 +252,6 @@ namespace cheat
 			}
 
 			return send_suspicion_play_data_hook.invoke<char>(a1, a2);
-		}
-
-		void cmd_add_resource(const command::params& params, bool processing)
-		{
-			if (!vars::cheats_enabled())
-			{
-				console::error("cheats are not enabled\n");
-				return;
-			}
-
-			if (params.size() < 2)
-			{
-				const auto cmd = params.get(0);
-				console::warn("WARNING: modifying resource counts CAN get you banned! (confirmed by experience) use at your own risk.");
-				console::info("usage: %s <resource index> <amount>\n", cmd.data());
-				for (auto i = 0; i < 59; i++)
-				{
-					console::info("%i: %s\n", i, resource_names[i]);
-				}
-
-				return;
-			}
-
-			const auto index = params.get_int(1);
-			const auto value = params.get_int(2);
-			if (index >= 59)
-			{
-				return;
-			}
-
-			const auto mb_sys = get_motherbase_sys();
-			if (mb_sys == nullptr || mb_sys->resourceController == nullptr)
-			{
-				return;
-			}
-
-			mb_sys->resourceController->__vftable->AddResource(
-				mb_sys->resourceController, static_cast<unsigned char>(index), value, -1, false, processing, true);
-		}
-
-		utils::hook::detour mission_preparation_get_total_gmp_cost_hook;
-		unsigned int mission_preparation_get_total_gmp_cost_stub(void* a1)
-		{
-			if (var_cheat_no_deployment_cost->current.enabled())
-			{
-				return 0u;
-			}
-
-			return mission_preparation_get_total_gmp_cost_hook.invoke<unsigned int>(a1);
-		}
-
-		utils::hook::detour mission_preparation_get_all_equip_resource_hook;
-		void mission_preparation_get_all_equip_resource_stub(void* a1, void* a2)
-		{
-			if (var_cheat_no_deployment_cost->current.enabled())
-			{
-				std::memset(a2, 0, 236);
-				return;
-			}
-
-			mission_preparation_get_all_equip_resource_hook.invoke<void>(a1, a2);
-		}
-
-		utils::hook::detour mission_preparation_calc_equip_resource_hook;
-		int mission_preparation_calc_equip_resource_stub(void* a1, void* a2, void* a3, float a4)
-		{
-			if (var_cheat_no_deployment_cost->current.enabled())
-			{
-				std::memset(a3, 0, 236);
-				return 0;
-			}
-
-			return mission_preparation_calc_equip_resource_hook.invoke<int>(a1, a2, a3, a4);
-		}
-
-		void mission_preparation_sub_gmp_stub(void* a1, unsigned int gmp)
-		{
-			if (var_cheat_no_deployment_cost->current.enabled())
-			{
-				return;
-			}
-
-			const auto mb_sys = get_motherbase_sys();
-			mb_sys->__vftable->SubTppGmp(mb_sys, gmp);
 		}
 	}
 
@@ -490,7 +314,8 @@ namespace cheat
 						return;
 					}
 
-					*mb_sys->heroicPoint = std::clamp(*mb_sys->heroicPoint + point, -99999999, 99999999);
+					*mb_sys->heroicPoint1 = std::clamp(*mb_sys->heroicPoint1 + point, -99999999, 99999999);
+					mb_sys->__vftable->ReflectHeroicPointDiffToSvars(mb_sys, *mb_sys->heroicPoint1);
 				});
 
 				command::add("cheat_set_ogre_point", [](const command::params& params)
@@ -513,42 +338,7 @@ namespace cheat
 						return;
 					}
 
-					*mb_sys->ogrePoint = std::clamp(point, -99999999, 99999999);
-				});
-
-				command::add("cheat_add_usable_resource", [](const command::params& params)
-				{
-					cmd_add_resource(params, false);
-				});
-
-				command::add("cheat_add_processing_resource", [](const command::params& params)
-				{
-					cmd_add_resource(params, true);
-				});
-
-				command::add("cheat_restore_quiet", []()
-				{
-					if (!vars::cheats_enabled())
-					{
-						console::error("cheats are not enabled\n");
-						return;
-					}
-
-					command::execute("script_exec TppStory.RequestReunionQuiet()");
-				});
-
-				command::add("cheat_add_buddy_point", [](const command::params& params)
-				{
-					if (!vars::cheats_enabled())
-					{
-						console::error("cheats are not enabled\n");
-						return;
-					}
-
-					const auto buddy = params.get_int(1);
-					const auto point = params.get_int(2);
-
-					command::execute(utils::string::va("script_exec TppBuddyService.AddFriendlyPoint(%i, %i)", buddy, point));
+					*mb_sys->ogrePoint1 = std::clamp(point, -99999999, 99999999);
 				});
 
 				var_cheat_unlockall_items = vars::register_bool("cheat_unlockall_server_items", false,
@@ -557,31 +347,17 @@ namespace cheat
 				var_cheat_disable_reporting = vars::register_bool("cheat_disable_reporting", false,
 					vars::var_flag_cheat | vars::var_flag_saved, "disable reporting suspicious gameplay to konami");
 
-				var_cheat_develop_limit = vars::register_int("cheat_develop_limit", 0, 0, vars::int_max,
-					vars::var_flag_cheat | vars::var_flag_saved, "override online item develop limit (0 = disabled)");
-
-				var_cheat_no_deployment_cost = vars::register_bool("cheat_no_deployment_cost", false, 
-					vars::var_flag_cheat | vars::var_flag_saved, "disable mission deployment cost");
-
-				utils::hook::jump(SELECT_VALUE_LANG(0x1408341FC, 0x1408331CC), utils::hook::assemble(cmd_get_server_item_list_result_unpack_stub), true);
-				utils::hook::jump(SELECT_VALUE_LANG(0x14083427C, 0x14083324C), utils::hook::assemble(cmd_get_server_item_list_result_unpack_stub2), true);
-
-				cmd_check_server_item_correct_hook.create(SELECT_VALUE_LANG(0x140835160, 0x14752AD10), cmd_check_server_item_correct_stub);
+				utils::hook::jump(SELECT_VALUE_LANG(0x14083359C, 0x1408331CC), utils::hook::assemble(cmd_get_server_item_list_result_unpack_stub), true);
+				cmd_check_server_item_correct_hook.create(SELECT_VALUE_LANG(0x145B4DE40, 0x14752AD10), cmd_check_server_item_correct_stub);
 			
-				send_suspicion_play_data_hook.create(SELECT_VALUE_LANG(0x14080A970, 0x140809A30), send_suspicion_play_data_stub);
-
-				mission_preparation_get_total_gmp_cost_hook.create(SELECT_VALUE_LANG(0x1416BB450, 0x1416BC550), mission_preparation_get_total_gmp_cost_stub);
-				mission_preparation_get_all_equip_resource_hook.create(SELECT_VALUE_LANG(0x1416BA660, 0x1416BB760), mission_preparation_get_all_equip_resource_stub);
-				mission_preparation_calc_equip_resource_hook.create(SELECT_VALUE_LANG(0x140953AF0, 0x140952A50), mission_preparation_calc_equip_resource_stub);
-				utils::hook::nop(SELECT_VALUE_LANG(0x14095B466, 0x14095A456), 6);
-				utils::hook::call(SELECT_VALUE_LANG(0x14095B466, 0x14095A456), mission_preparation_sub_gmp_stub);
+				send_suspicion_play_data_hook.create(SELECT_VALUE_LANG(0x140809DD0, 0x140809A30), send_suspicion_play_data_stub);
 			}
 			else
 			{
 				var_cheat_unlockall_gear = vars::register_bool("cheat_unlockall_gear", false, 
 					vars::var_flag_cheat | vars::var_flag_saved, "unlock all gear");
 
-				utils::hook::jump(SELECT_VALUE_LANG(0x140598B08, 0x140598318), utils::hook::assemble(get_purchasable_item_list_stub), true, true);
+				utils::hook::jump(SELECT_VALUE_LANG(0x140598938, 0x140598318), utils::hook::assemble(get_purchasable_item_list_stub), true, true);
 			}
 		}
 
@@ -592,4 +368,4 @@ namespace cheat
 	};
 }
 
-REGISTER_COMPONENT(cheat::component)
+REGISTER_COMPONENT(staff::component)

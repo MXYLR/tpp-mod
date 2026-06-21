@@ -366,7 +366,9 @@ namespace text_chat::input
 			command::add("clearchat", [](const command::params& params)
 			{
 				clear();
-			});
+			},
+			"Clear the chat history",
+			"clearchat");
 
 			command::add("chatall", []
 			{
@@ -381,7 +383,9 @@ namespace text_chat::input
 					state.is_typing = true;
 					state.mode = mode_chat;
 				});
-			});
+			},
+			"Open chat input in all/global chat mode",
+			"chatall");
 
 			command::add("chatteam", []
 			{
@@ -396,7 +400,9 @@ namespace text_chat::input
 					state.is_typing = true;
 					state.mode = mode_chat_team;
 				});
-			});
+			},
+			"Open chat input in team chat mode",
+			"chatteam");
 		}
 	};
 }

@@ -44,7 +44,7 @@
 #include <VersionHelpers.h>
 #include <Psapi.h>
 #include <urlmon.h>
-#include <atlbase.h>
+// #include <atlbase.h>
 #include <iphlpapi.h>
 #include <wincrypt.h>
 #include <dwmapi.h>
