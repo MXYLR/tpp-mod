@@ -287,58 +287,96 @@ namespace server_logging
 			}
 
 			bool open_wormhole(std::uint64_t target_player_id, std::uint64_t my_player_id)
+		{
+			if (!has_session_key())
 			{
-				if (!has_session_key())
-				{
-					console::error("[TPP Client] No session key available!");
-					console::error("[TPP Client] Please wait for CMD_REQAUTH_HTTPS response first.");
-					return false;
-				}
-
-				nlohmann::json wormhole_json;
-				wormhole_json["flag"] = "FRIENDLY";
-				wormhole_json["is_open"] = 1;
-				wormhole_json["msgid"] = "CMD_OPEN_WORMHOLE";
-				wormhole_json["player_id"] = my_player_id;
-				wormhole_json["retaliate_score"] = 252;
-				wormhole_json["rqid"] = 0;
-				wormhole_json["to_player_id"] = target_player_id;
-
-				console::info("[TPP Client] Opening wormhole:");
-				console::info("[TPP Client]   player_id (me): %llu", my_player_id);
-				console::info("[TPP Client]   to_player_id (target): %llu", target_player_id);
-
-				return send_command(wormhole_json, false);
+				console::error("[TPP Client] No session key available!");
+				console::error("[TPP Client] Please wait for CMD_REQAUTH_HTTPS response first.");
+				return false;
 			}
+
+			nlohmann::json wormhole_json;
+			// flag: FOB invasion type flag
+			//   FRIENDLY - friendly visit (normal invasion flow)
+			//   RETALIATE - retaliation counter-attack
+			wormhole_json["flag"] = "FRIENDLY";
+			// is_open: whether to open wormhole
+			//   1 = open wormhole
+			//   0 = close wormhole
+			wormhole_json["is_open"] = 1;
+			// msgid: message ID, identifies request type
+			wormhole_json["msgid"] = "CMD_OPEN_WORMHOLE";
+			// player_id: player ID initiating wormhole request
+			wormhole_json["player_id"] = my_player_id;
+			// retaliate_score: retaliation score, used to calculate invasion results
+			//   default value 252 is standard invasion config
+			wormhole_json["retaliate_score"] = 252;
+			// rqid: request sequence number, used for tracking request-response pairing
+			//   0 = synchronous request (wait for response)
+			wormhole_json["rqid"] = 0;
+			// to_player_id: target player ID, the player the wormhole leads to
+			wormhole_json["to_player_id"] = target_player_id;
+
+			console::info("[TPP Client] Opening wormhole:");
+			console::info("[TPP Client]   player_id (me): %llu", my_player_id);
+			console::info("[TPP Client]   to_player_id (target): %llu", target_player_id);
+
+			return send_command(wormhole_json, false);
+		}
 
 			bool get_fob_target_detail(std::uint64_t mother_base_id)
+		{
+			if (!has_session_key())
 			{
-				if (!has_session_key())
-				{
-					console::error("[TPP Client] No session key available!");
-					console::error("[TPP Client] Please wait for CMD_REQAUTH_HTTPS response first.");
-					return false;
-				}
-
-				nlohmann::json json;
-				json["is_event"] = 0;
-				json["is_plus"] = 0;
-				json["is_sneak"] = 1;
-				json["is_steal"] = 0;
-				json["mgo_id"] = 0;
-				json["mode"] = "actual";
-				json["mother_base_id"] = mother_base_id;
-				json["msgid"] = "CMD_GET_FOB_TARGET_DETAIL";
-				json["platform"] = 0;
-				json["rqid"] = 0;
-
-				console::info("[TPP Client] Getting FOB target detail:");
-				console::info("[TPP Client]   mother_base_id: %llu", mother_base_id);
-				console::info("[TPP Client]   mode: actual");
-				console::info("[TPP Client]   is_sneak: 1");
-
-				return send_command(json, false);
+				console::error("[TPP Client] No session key available!");
+				console::error("[TPP Client] Please wait for CMD_REQAUTH_HTTPS response first.");
+				return false;
 			}
+
+			nlohmann::json json;
+			// is_event: whether this is an event FOB
+			//   0 = normal FOB
+			//   1 = event FOB
+			json["is_event"] = 0;
+			// is_plus: whether this is a PLUS member FOB
+			//   0 = regular player
+			//   1 = PLUS member
+			json["is_plus"] = 0;
+			// is_sneak: whether in stealth mode
+			//   0 = not stealth (usually combat mode)
+			//   1 = stealth mode
+			json["is_sneak"] = 1;
+			// is_steal: whether in steal mode
+			//   0 = not stealing
+			//   1 = stealing (invasion)
+			json["is_steal"] = 0;
+			// mgo_id: MGO server ID (used in MGO mode, 0 in TPP)
+			json["mgo_id"] = 0;
+			// mode: FOB mode
+			//   actual = real invasion (affects actual game data)
+			//   rehearsal = rehearsal mode (does not affect actual data)
+			json["mode"] = "actual";
+			// mother_base_id: mother base ID, uniquely identifies target player's FOB
+			json["mother_base_id"] = mother_base_id;
+			// msgid: message ID, identifies request type
+			json["msgid"] = "CMD_GET_FOB_TARGET_DETAIL";
+			// platform: gaming platform
+			//   0 = PC (Steam)
+			//   1 = PS3
+			//   2 = PS4
+			//   3 = Xbox360
+			//   4 = XboxOne
+			json["platform"] = 0;
+			// rqid: request sequence number, for tracking request-response pairing
+			json["rqid"] = 0;
+
+			console::info("[TPP Client] Getting FOB target detail:");
+			console::info("[TPP Client]   mother_base_id: %llu", mother_base_id);
+			console::info("[TPP Client]   mode: actual");
+			console::info("[TPP Client]   is_sneak: 1");
+
+			return send_command(json, false);
+		}
 		};
 
 		tpp_client tpp_client_instance_;
@@ -363,8 +401,14 @@ namespace server_logging
 			return data;
 		}
 
+		// intercept_list_type_convert: intercept and modify CMD_GET_FOB_TARGET_LIST request list type
+		// Function: convert FOB list type from one to another
+		// Example: convert PICKUP list to FOLLOW list
+		// This allows the game to display list content that would not normally be shown
 		bool intercept_list_type_convert(game::fox::Buffer* buffer)
 		{
+			// list_type_convert_enabled: global switch, controlled by fob_convert_list_type command
+			// buffer: game buffer containing JSON data to modify
 			if (!list_type_convert_enabled || buffer == nullptr)
 			{
 				return false;
@@ -380,12 +424,18 @@ namespace server_logging
 					const std::string raw_data{buf, buf + buf_size};
 					auto json = nlohmann::json::parse(raw_data, nullptr, false);
 
+					// Check if this is a CMD_GET_FOB_TARGET_LIST request
+					// This is the main command to get FOB target list
 					if (!json.is_discarded() && json.is_object() && json.contains("msgid") &&
 						json["msgid"].is_string() && json["msgid"].get<std::string>() == "CMD_GET_FOB_TARGET_LIST")
 					{
+						// type field specifies the list type to retrieve
+						// Valid values: TRIAL, PICKUP, PICKUP_HIGH, ENEMY, EVENT, NUCLEAR, FOLLOW, FOLLOWER, DEPLOYED, INJURY, EMERGENCY, FR_ENEMY
 						if (json.contains("type") && json["type"].is_string())
 						{
 							const auto current_type = json["type"].get<std::string>();
+							// list_type_convert_from: original type to convert from
+							// list_type_convert_to: target type to convert to
 							if (current_type == list_type_convert_from)
 							{
 								console::info("[FOB] Converting list type: %s -> %s",
@@ -393,6 +443,7 @@ namespace server_logging
 								json["type"] = list_type_convert_to;
 
 								const auto new_data = json.dump(-1);
+								// Ensure modified data fits in the original buffer
 								if (new_data.size() <= buffer->capacity)
 								{
 									std::memcpy(buf, new_data.data(), new_data.size());
@@ -410,8 +461,14 @@ namespace server_logging
 			return false;
 		}
 
+		// intercept_add_follow_request: intercept CMD_ADD_FOLLOW request and override steam_id and player_id
+		// Function: allows user to spoof support requests to any player
+		// Usage: bypass FOB defense, add any player as support, etc.
+		// Trigger: configure add_follow_override_* variables, then trigger CMD_ADD_FOLLOW request in game
 		bool intercept_add_follow_request(game::fox::Buffer* buffer)
 		{
+			// add_follow_override_enabled: global switch, determines whether to intercept request
+			// buffer: game buffer containing CMD_ADD_FOLLOW JSON data
 			if (!add_follow_override_enabled || buffer == nullptr)
 			{
 				return false;
@@ -427,17 +484,23 @@ namespace server_logging
 					const std::string raw_data{buf, buf + buf_size};
 					auto json = nlohmann::json::parse(raw_data, nullptr, false);
 
+					// Check if this is a CMD_ADD_FOLLOW request
+					// CMD_ADD_FOLLOW: send support request to server (for friends/non-friends)
 					if (!json.is_discarded() && json.is_object() && json.contains("msgid") &&
 						json["msgid"].is_string() && json["msgid"].get<std::string>() == "CMD_ADD_FOLLOW")
 					{
 						console::info("[FOB] Intercepting CMD_ADD_FOLLOW request");
 
+						// steam_id: unique Steam account identifier
+						// Used to determine target player for support request
 						if (add_follow_override_steam_id != 0)
 						{
 							console::info("[FOB]   Setting steam_id: %llu", add_follow_override_steam_id);
 							json["steam_id"] = add_follow_override_steam_id;
 						}
 
+						// player_id: in-game player ID (different from steam_id)
+						// Some requests need both steam_id and player_id set
 						if (add_follow_override_player_id != 0)
 						{
 							console::info("[FOB]   Setting player_id: %llu", add_follow_override_player_id);
@@ -446,12 +509,15 @@ namespace server_logging
 
 						const auto new_data = json.dump(-1);
 
+						// Check if modified JSON fits in original buffer
 						if (new_data.size() <= buffer->capacity)
 						{
 							std::memcpy(buf, new_data.data(), new_data.size());
 							buffer->size = new_data.size();
 							console::info("[FOB]   Modified request (size: %zu)", new_data.size());
 
+							// one-shot mode: auto-disable after one interception
+							// Used to恢复正常流程 after single operation
 							if (add_follow_override_one_shot)
 							{
 								add_follow_override_enabled = false;
@@ -475,12 +541,18 @@ namespace server_logging
 			return false;
 		}
 
+		// send_add_follow_request: configure CMD_ADD_FOLLOW interceptor parameters
+		// Parameters:
+		//   steam_id: target player's Steam ID (set to 0 to not override)
+		//   player_id: target player's in-game ID (set to 0 to not override)
+		// Description: after configuration, the next CMD_ADD_FOLLOW request from game will be intercepted and modified
+		//             User needs to trigger game's support request (via Relationships menu -> Friends list -> select player -> click Support)
 		void send_add_follow_request(const std::uint64_t steam_id, const std::uint64_t player_id)
 		{
 			add_follow_override_steam_id = steam_id;
 			add_follow_override_player_id = player_id;
 			add_follow_override_enabled = true;
-			add_follow_override_one_shot = true;
+			add_follow_override_one_shot = true;  // one-shot mode, auto-disable after interception
 
 			console::info("[FOB] CMD_ADD_FOLLOW interceptor armed:");
 			console::info("[FOB]   steam_id: %llu", steam_id);
@@ -523,6 +595,18 @@ namespace server_logging
 
 					if (var_server_logging->current.enabled())
 					{
+						// Write the processed JSON back to the buffer for the game to use
+						const auto modified_data = json.dump(-1);
+						if (modified_data.size() <= buffer->capacity)
+						{
+							std::memcpy(game::fox::Buffer_::GetBuffer(buffer), modified_data.data(), modified_data.size());
+							buffer->size = modified_data.size();
+						}
+						else
+						{
+							console::error("[server logging] Modified response too large for buffer");
+						}
+
 						const auto path = get_dump_path(cmd, false);
 						utils::io::write_file(path, json.dump(4));
 					}
@@ -532,6 +616,10 @@ namespace server_logging
 			return res;
 		}
 
+		// intercept_sneak_result: intercept CMD_SEND_SNEAK_RESULT response and parse FOB invasion results
+		// Function: after player completes FOB invasion, parse and display detailed combat statistics
+		// Trigger: when game receives CMD_SEND_SNEAK_RESULT response from server
+		// Display: kill count, damage values, sneak points, goal completion status, etc.
 		void intercept_sneak_result(game::fox::Buffer* buffer)
 		{
 			if (buffer == nullptr) return;
@@ -539,54 +627,112 @@ namespace server_logging
 			try
 			{
 				const auto data = get_fox_buffer(buffer);
-				auto json = nlohmann::json::parse(data, nullptr, false);
-				if (!json.is_discarded() && json.is_object() && json.contains("msgid") &&
-					json["msgid"].is_string() && json["msgid"].get<std::string>() == "CMD_SEND_SNEAK_RESULT")
+				if (data.empty())
 				{
-					const auto result = json.value("sneak_result", "?");
-					const auto dp = json.value("damage_point", 0);
-					const auto rp = json.value("retaliate_point", 0);
-					const auto sneak_pt = json.value("sneak_point", 0);
-					const auto is_goal = json.value("is_goal", 0);
-					const auto perfect_stealth = json.value("is_perfect_stealth", 0);
-
-					// Enemy casualties
-					const auto injure = json.value("injure_soldier_num", 0);
-					const auto injure_sup = json.value("injure_support_soldier_num", 0);
-					const auto kill = json.value("kill_soldier_num", 0);
-					const auto kill_sup = json.value("kill_support_soldier_num", 0);
-					const auto cap_player = json.value("capture_player_soldier_num", 0);
-					const auto cap = json.value("capture_soldier_num", 0);
-					const auto cap_sup = json.value("capture_support_soldier_num", 0);
-
-					const auto total_injure = injure + injure_sup;
-					const auto total_kill = kill + kill_sup;
-					const auto total_capture = cap + cap_sup + cap_player;
-					const auto grand_total = total_injure + total_kill + total_capture;
-
-					console::info("========== FOB Invasion Result ==========");
-					console::info("  Result: %s | Goal: %s | Perfect Stealth: %s",
-						result.c_str(),
-						is_goal ? "YES" : "NO",
-						perfect_stealth ? "YES" : "NO");
-					console::info("  Sneak Point: %d | Damage: %d | Retaliate: %d",
-						sneak_pt, dp, rp);
-
-					console::info("  --- Casualties (Enemy) ---");
-					console::info("  Kill Soldier:      %4d  (+ Support: %d)", kill, kill_sup);
-					console::info("  Injure Soldier:    %4d  (+ Support: %d)", injure, injure_sup);
-					console::info("  Capture Soldier:   %4d  (+ Support: %d, Player: %d)",
-						cap, cap_sup, cap_player);
-
-					console::info("  --- Totals ---");
-					console::info("  Killed:   %d  |  Injured:  %d  |  Captured: %d",
-						total_kill, total_injure, total_capture);
-					console::info("  Grand Total (enemies neutralized): %d", grand_total);
-					console::info("==========================================");
+					console::info("[sneak_result] buffer empty, raw_size=%zu",
+						game::fox::Buffer_::GetSize(buffer));
+					return;
 				}
+
+				auto json = nlohmann::json::parse(data, nullptr, false);
+				if (json.is_discarded())
+				{
+					console::info("[sneak_result] JSON parse failed, first 64 bytes: %.*s",
+						static_cast<int>(std::min<size_t>(64, data.size())), data.data());
+					return;
+				}
+
+				if (!json.is_object())
+				{
+					console::info("[sneak_result] not an object, type=%d", static_cast<int>(json.type()));
+					return;
+				}
+
+				if (!json.contains("msgid"))
+				{
+					console::info("[sneak_result] no msgid, keys=%zu", json.size());
+					return;
+				}
+
+				const auto msgid = json.value("msgid", "");
+				console::info("[sneak_result] msgid=\"%s\"", msgid.c_str());
+
+				// CMD_SEND_SNEAK_RESULT: FOB invasion result report
+				// Contains all statistics for this invasion
+				if (msgid != "CMD_SEND_SNEAK_RESULT")
+					return;
+
+				// ===== Basic Invasion Results =====
+				// sneak_result: invasion result status
+				//   "success" - successfully completed invasion
+				//   "failure" - invasion failed
+				//   "aborted" - invasion aborted
+				const auto result = json.value("sneak_result", "?");
+				// damage_point: damage points dealt to enemy base
+				const auto dp = json.value("damage_point", 0);
+				// retaliate_point: retaliation points (score gained from enemy counter-attack)
+				const auto rp = json.value("retaliate_point", 0);
+				// sneak_point: stealth points (score calculated based on stealth performance)
+				const auto sneak_pt = json.value("sneak_point", 0);
+				// is_goal: whether main objective was completed
+				//   0 - main objective not completed
+				//   1 - main objective completed
+				const auto is_goal = json.value("is_goal", 0);
+				// is_perfect_stealth: whether perfect stealth was achieved (no alert)
+				//   0 - alert was triggered
+				//   1 - perfect stealth
+				const auto perfect_stealth = json.value("is_perfect_stealth", 0);
+
+				// ===== Enemy Casualty Statistics =====
+				// injure_soldier_num: number of soldiers injured (not killed, but neutralized)
+				const auto injure = json.value("injure_soldier_num", 0);
+				// injure_support_soldier_num: number of support soldiers injured
+				const auto injure_sup = json.value("injure_support_soldier_num", 0);
+				// kill_soldier_num: number of soldiers killed
+				const auto kill = json.value("kill_soldier_num", 0);
+				// kill_support_soldier_num: number of support soldiers killed
+				const auto kill_sup = json.value("kill_support_soldier_num", 0);
+				// capture_player_soldier_num: number of player-deployed soldiers captured
+				const auto cap_player = json.value("capture_player_soldier_num", 0);
+				// capture_soldier_num: number of soldiers captured
+				const auto cap = json.value("capture_soldier_num", 0);
+				// capture_support_soldier_num: number of support soldiers captured
+				const auto cap_sup = json.value("capture_support_soldier_num", 0);
+
+				// Calculate total casualties and grand total
+				const auto total_injure = injure + injure_sup;
+				const auto total_kill = kill + kill_sup;
+				const auto total_capture = cap + cap_sup + cap_player;
+				const auto grand_total = total_injure + total_kill + total_capture;
+
+				// ===== Output Formatted Results =====
+				console::info("========== FOB Invasion Result ==========");
+				console::info("  Result: %s | Goal: %s | Perfect Stealth: %s",
+					result.c_str(),
+					is_goal ? "YES" : "NO",
+					perfect_stealth ? "YES" : "NO");
+				console::info("  Sneak Point: %d | Damage: %d | Retaliate: %d",
+					sneak_pt, dp, rp);
+
+				console::info("  --- Casualties (Enemy) ---");
+				console::info("  Kill Soldier:      %4d  (+ Support: %d)", kill, kill_sup);
+				console::info("  Injure Soldier:    %4d  (+ Support: %d)", injure, injure_sup);
+				console::info("  Capture Soldier:   %4d  (+ Support: %d, Player: %d)",
+					cap, cap_sup, cap_player);
+
+				console::info("  --- Totals ---");
+				console::info("  Killed:   %d  |  Injured:  %d  |  Captured: %d",
+					total_kill, total_injure, total_capture);
+				console::info("  Grand Total (enemies neutralized): %d", grand_total);
+				console::info("==========================================");
+			}
+			catch (const std::exception& ex)
+			{
+				console::error("[sneak_result] exception: %s", ex.what());
 			}
 			catch (...)
 			{
+				console::error("[sneak_result] unknown exception");
 			}
 		}
 
@@ -806,6 +952,85 @@ namespace server_logging
 				else
 				{
 					console::error("[FOB] Failed to send wormhole command!");
+				}
+			});
+
+			// fob_get_target_detail command - Send CMD_GET_FOB_TARGET_DETAIL to get FOB information
+			// After opening a wormhole with fob_open_wormhole, use this command
+			// to fetch the updated FOB details from the server.
+			// Then go back to FOB menu (ESC) and re-select the target to see the changes.
+			command::add("fob_get_target_detail", [](const command::params& params)
+			{
+				if (params.size() < 2)
+				{
+					console::info("Usage: fob_get_target_detail <target_steam_id>");
+					console::info("Example: fob_get_target_detail 76561199505076493");
+					console::info("");
+					console::info("Sends CMD_GET_FOB_TARGET_DETAIL directly to Konami servers.");
+					console::info("Use this AFTER running fob_open_wormhole to get target FOB details.");
+					console::info("");
+					console::info("Mother base ID is automatically retrieved from cache.");
+					console::info("");
+					console::info("Requires:");
+					console::info("  - Session key from CMD_REQAUTH_HTTPS");
+					console::info("  - Target player in FOB cache");
+					return;
+				}
+
+				const auto target_steam_id = params.get_uint64(1);
+
+				if (!tpp_client_instance_.has_session_key())
+				{
+					console::error("[FOB Detail] No session key available!");
+					console::error("[FOB Detail] Please wait for CMD_REQAUTH_HTTPS response first.");
+					return;
+				}
+
+				const auto target_cached = fob_target::get_cached_player(target_steam_id);
+				if (!target_cached.has_value())
+				{
+					console::error("[FOB Detail] Could not find target in cache.");
+					console::error("[FOB Detail]   target_steam_id: %llu", target_steam_id);
+					console::error("[FOB Detail] Please access the FOB menu first to populate the cache.");
+					console::error("[FOB Detail] Or add the target using fob_add_target first.");
+					return;
+				}
+
+				const auto mother_base_id = static_cast<std::uint64_t>(target_cached->mother_base_id);
+
+				if (mother_base_id == 0)
+				{
+					console::error("[FOB Detail] Mother base ID not found in cache.");
+					console::error("[FOB Detail]   target_steam_id: %llu", target_steam_id);
+					console::error("[FOB Detail]   target_player_id: %llu", static_cast<std::uint64_t>(target_cached->player_id));
+					console::error("[FOB Detail] Please try browsing FOB lists again.");
+					return;
+				}
+
+				console::info("[FOB Detail] Found target in cache:");
+				console::info("[FOB Detail]   steam_id:       %llu", target_steam_id);
+				console::info("[FOB Detail]   player_id:      %llu", static_cast<std::uint64_t>(target_cached->player_id));
+				console::info("[FOB Detail]   mother_base_id: %llu", mother_base_id);
+				console::info("[FOB Detail]   name:           %s", target_cached->name.c_str());
+
+				console::info("[FOB Detail] Sending CMD_GET_FOB_TARGET_DETAIL...");
+
+				const bool success = tpp_client_instance_.get_fob_target_detail(mother_base_id);
+
+				if (success)
+				{
+					console::info("==================================================");
+					console::info("FOB DETAIL REQUEST SENT!");
+					console::info("==================================================");
+					console::info("Check the console above for server response.");
+					console::info("Now go back to FOB menu (ESC) and re-select the target.");
+					console::info("The blockade should now be bypassed.");
+				}
+				else
+				{
+					console::error("==================================================");
+					console::error("FOB DETAIL REQUEST FAILED!");
+					console::error("==================================================");
 				}
 			});
 

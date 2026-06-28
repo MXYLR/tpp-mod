@@ -1484,7 +1484,11 @@ namespace game
 			struct LayoutComponent;
 			struct Layout;
 			struct GraphState;
-			struct ModelNodeCommon;
+			struct ModelNodeCommon
+			{
+				char __pad0[108];
+				std::uint32_t hash;
+			};
 			struct Animation;
 
 			struct Font
@@ -5273,8 +5277,8 @@ namespace game
 			void* (__fastcall* IsVisible2)(fox::uix::impl::UixUtilityImpl* this_, fox::ui::LayoutComponent*);
 			void* (__fastcall* SetAlpha1)(fox::uix::impl::UixUtilityImpl* this_, fox::ui::ModelNode*, float);
 			void* (__fastcall* SetAlpha2)(fox::uix::impl::UixUtilityImpl* this_, fox::ui::LayoutComponent*, float);
-			void* (__fastcall* GetAlpha3)(fox::uix::impl::UixUtilityImpl* this_, fox::ui::ModelNode*);
-			void* (__fastcall* GetAlpha4)(fox::uix::impl::UixUtilityImpl* this_, fox::ui::LayoutComponent*);
+			float (__fastcall* GetAlpha1)(fox::uix::impl::UixUtilityImpl* this_, fox::ui::ModelNode*);
+			float (__fastcall* GetAlpha2)(fox::uix::impl::UixUtilityImpl* this_, fox::ui::LayoutComponent*);
 			void* (__fastcall* SetColorRGB1)(fox::uix::impl::UixUtilityImpl* this_, fox::ui::ModelNode*, fox::Rgba8);
 			void* (__fastcall* SetColorRGB2)(fox::uix::impl::UixUtilityImpl* this_, fox::ui::LayoutComponent*, fox::Rgba8);
 			void* (__fastcall* SetColorRGB3)(fox::uix::impl::UixUtilityImpl* this_, fox::ui::ModelNode*, fox::Color*);
@@ -5538,8 +5542,8 @@ namespace game
 			void* (__fastcall* IsVisible2)(fox::uix::impl::UixUtilityImpl* this_, fox::ui::LayoutComponent*);
 			void* (__fastcall* SetAlpha1)(fox::uix::impl::UixUtilityImpl* this_, fox::ui::ModelNode*, float);
 			void* (__fastcall* SetAlpha2)(fox::uix::impl::UixUtilityImpl* this_, fox::ui::LayoutComponent*, float);
-			void* (__fastcall* GetAlpha3)(fox::uix::impl::UixUtilityImpl* this_, fox::ui::ModelNode*);
-			void* (__fastcall* GetAlpha4)(fox::uix::impl::UixUtilityImpl* this_, fox::ui::LayoutComponent*);
+			float (__fastcall* GetAlpha1)(fox::uix::impl::UixUtilityImpl* this_, fox::ui::ModelNode*);
+			float (__fastcall* GetAlpha2)(fox::uix::impl::UixUtilityImpl* this_, fox::ui::LayoutComponent*);
 			void* (__fastcall* SetColorRGB1)(fox::uix::impl::UixUtilityImpl* this_, fox::ui::ModelNode*, fox::Rgba8);
 			void* (__fastcall* SetColorRGB2)(fox::uix::impl::UixUtilityImpl* this_, fox::ui::LayoutComponent*, fox::Rgba8);
 			void* (__fastcall* SetColorRGB3)(fox::uix::impl::UixUtilityImpl* this_, fox::ui::ModelNode*, fox::Color*);

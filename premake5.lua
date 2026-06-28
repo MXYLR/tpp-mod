@@ -320,5 +320,22 @@ project "client"
 
 	dependencies.imports()
 
+project "fob_gui_app"
+	kind "WindowedApp"
+	language "C++"
+
+	targetname "fob-gui"
+
+	files {"./src/fob_gui_app/**.cpp", "./src/fob_gui_app/**.hpp"}
+
+	includedirs {"./deps/imgui"}
+
+	links {"imgui"}
+
+	-- NOTE: fob_gui_app is a standalone GUI app.
+	-- Do NOT add dependencies.imports() here - that links game DLL libs
+	-- (asmjit, curl, discord-rpc, libtomcrypt, etc.) whose global
+	-- constructors crash at startup.
+
 group "Dependencies"
 	dependencies.projects()
