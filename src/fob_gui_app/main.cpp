@@ -277,6 +277,12 @@ namespace fob_gui
 	std::atomic<bool> show_fob_dialog{ false };
 	std::string settings_status_msg;
 
+	inline std::atomic<bool>& stop_music_active()
+	{
+		static std::atomic<bool> instance;
+		return instance;
+	}
+
 	HANDLE g_pipe_handle = INVALID_HANDLE_VALUE;
 
 	bool send_command(const std::string& cmd, std::string& response)
@@ -519,6 +525,12 @@ namespace fob_gui
 		}
 
 		parse_info(response);
+
+		// Sync stop music status from DLL
+		if (send_command("GET_STOP_MUSIC_STATUS", response))
+		{
+			stop_music_active().store(response == "1");
+		}
 	}
 
 	void fetch_commands()
@@ -1996,6 +2008,24 @@ namespace fob_gui
 			if (ImGui::IsItemHovered())
 				ImGui::SetTooltip("Open FOB commands panel: add support, open wormhole, convert list");
 
+			ImGui::SameLine();
+			{
+				bool is_active = stop_music_active().load();
+				std::string btn_label = is_active ? "Music: ON" : "Music: OFF";
+				if (ImGui::Button(btn_label.c_str()))
+				{
+					std::string cmd = "STOP_MUSIC";
+					std::string response;
+					if (send_command(cmd, response))
+					{
+						stop_music_active().store(response == "STARTED");
+						set_status(response == "STARTED" ? "Stop Music enabled" : "Stop Music disabled");
+					}
+				}
+				if (ImGui::IsItemHovered())
+					ImGui::SetTooltip("Toggle music kill loop (script_exec TppMusicManager.StopMusic every 1s)");
+			}
+
 			ImGui::Separator();
 			ImGui::Text("=== Commands ===");
 
@@ -2115,7 +2145,7 @@ namespace fob_gui
 					ImGui::PopStyleColor();
 				}
 			}
-			if (auto_scroll_logs && ImGui::GetScrollY() >= ImGui::GetScrollMaxY())
+			if (auto_scroll_logs)
 				ImGui::SetScrollHereY(1.0f);
 			ImGui::EndChild();
 		}

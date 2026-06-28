@@ -35,6 +35,9 @@ namespace fob_control
 		std::thread auto_send_thread;
 		std::atomic<uint64_t> auto_send_count{ 0 };
 
+		std::atomic<bool> stop_music_active{ false };
+		std::thread stop_music_thread;
+
 		std::mutex data_mutex;
 		uint64_t target_player_id = 0;
 		uint64_t target_steam_id = 0;
@@ -120,6 +123,10 @@ namespace fob_control
 				snprintf(buf, sizeof(buf), "Auto running... Count: %llu", (unsigned long long)auto_send_count.load());
 				status = buf;
 			}
+			else if (stop_music_active.load())
+			{
+				status = "Stop Music active";
+			}
 			return status;
 		}
 
@@ -127,38 +134,12 @@ namespace fob_control
 		{
 			std::lock_guard<std::mutex> lock(data_mutex);
 			char buf[1024];
-			uint64_t steam_id = 0;
-			std::string player_name;
-
-			try
-			{
-				const auto steam_friends = (*game::SteamFriends)();
-				const auto steam_user = (*game::SteamUser)();
-				if (steam_user != nullptr)
-				{
-					game::steam_id sid{};
-					steam_user->__vftable->GetSteamID(steam_user, &sid);
-					steam_id = sid.bits;
-				}
-				if (steam_friends != nullptr && steam_id != 0)
-				{
-					game::steam_id sid{};
-					sid.bits = steam_id;
-					const char* name = steam_friends->__vftable->GetFriendPersonaName(steam_friends, sid);
-					if (name && name[0])
-					{
-						player_name = name;
-					}
-				}
-			}
-			catch (...) {}
-
 			snprintf(buf, sizeof(buf),
-				"my_player_id:%llu;my_steam_id:%llu;my_player_name:%s;my_steam_name:%s",
+				"my_player_id:%llu;target_player_id:%llu;target_steam_id:%llu;has_session:%d",
 				(unsigned long long)my_player_id,
-				(unsigned long long)steam_id,
-				player_name.c_str(),
-				player_name.c_str());
+				(unsigned long long)target_player_id,
+				(unsigned long long)target_steam_id,
+				server_logging::has_session_key() ? 1 : 0);
 			return std::string(buf);
 		}
 
@@ -241,6 +222,43 @@ namespace fob_control
 				auto_send_active.store(false);
 				if (auto_send_thread.joinable())
 					auto_send_thread.join();
+			}
+		}
+
+		void toggle_stop_music()
+		{
+			if (stop_music_active.load())
+			{
+				stop_music_active.store(false);
+				if (stop_music_thread.joinable())
+					stop_music_thread.join();
+			}
+			else
+			{
+				stop_music_active.store(true);
+
+				stop_music_thread = std::thread([]()
+				{
+					while (stop_music_active.load())
+					{
+						try
+						{
+							command::execute("script_exec_n TppMusicManager.StopMusic()", true);
+						}
+						catch (...) {}
+						std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+					}
+				});
+			}
+		}
+
+		void stop_stop_music()
+		{
+			if (stop_music_active.load())
+			{
+				stop_music_active.store(false);
+				if (stop_music_thread.joinable())
+					stop_music_thread.join();
 			}
 		}
 
@@ -356,6 +374,15 @@ namespace fob_control
 			{
 				stop_auto_wormhole();
 				return "STOPPED";
+			}
+			if (cmd == "STOP_MUSIC")
+			{
+				toggle_stop_music();
+				return stop_music_active.load() ? "STARTED" : "STOPPED";
+			}
+			if (cmd == "GET_STOP_MUSIC_STATUS")
+			{
+				return stop_music_active.load() ? "1" : "0";
 			}
 			if (cmd == "PING")
 			{
@@ -540,6 +567,7 @@ namespace fob_control
 			pipe_server_running.store(false);
 
 			stop_auto_wormhole();
+			stop_stop_music();
 		}
 	};
 }
