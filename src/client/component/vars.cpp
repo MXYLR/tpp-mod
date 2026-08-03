@@ -55,7 +55,7 @@ namespace vars
 			}
 
 			done = true;
-			var_cheat_enabled = register_bool("cheat_enabled", true, vars::var_flag_saved, "enable cheats");
+			var_cheat_enabled = register_bool("cheat_enabled", true, 0, "enable cheats");
 			var_cheat_enabled->set_callback = reset_cheats;
 		}
 	}
