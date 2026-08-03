@@ -8460,3 +8460,4 @@ namespace game
 	static_assert(offsetof(match_settings_t, member_max) == 32);
 	static_assert(offsetof(mgo_matchmaking_manager, state) == 5500);
 }
+
