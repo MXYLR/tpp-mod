@@ -150,3 +150,6 @@ user*.bat
 #premake5.exe
 
 src/client/component/experiments/*
+
+# Local reference repo
+tpp-mod-mxylr-old/

@@ -176,6 +176,26 @@ namespace patches
 			get_persona_name_hook.create(steam_friends->__vftable->GetPersonaName, get_persona_name_stub);
 		}
 
+		utils::hook::detour get_friend_count_hook;
+		int get_friend_count_stub(game::ISteamFriends* this_, int eFriendFlags)
+		{
+			auto count = get_friend_count_hook.invoke<int>(this_, eFriendFlags);
+			if (count > 50)
+			{
+				count = 50;
+			}
+			return count;
+		}
+
+		void limit_friend_count()
+		{
+			const auto steam_friends = (*game::SteamFriends)();
+			if (steam_friends != nullptr)
+			{
+				get_friend_count_hook.create(steam_friends->__vftable->GetFriendCount, get_friend_count_stub);
+			}
+		}
+
 		void player_mouse_event_update_stub(__int64 a1)
 		{
 			const auto time_system = game::fox::GetTimeSystem();
@@ -528,6 +548,10 @@ namespace patches
 
 				utils::hook::nop(SELECT_VALUE_LANG(0x1405597A1, 0x144B8861D), 6);
 				utils::hook::call(SELECT_VALUE_LANG(0x1405597A1, 0x144B8861D), strncpy_s_stub);
+
+				// Limit GetFriendCount to 50 to prevent crash when opening
+				// FOB friend/follow lists with many Steam friends
+				scheduler::once(limit_friend_count, scheduler::main);
 			}
 
 			utils::hook::nop(SELECT_VALUE(0x1400013F9, 0x1400014E9, 0x142E4F8E8, 0x142232258), 6);

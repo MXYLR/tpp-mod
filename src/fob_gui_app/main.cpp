@@ -51,6 +51,8 @@ namespace fob_gui
 		int w = 990;
 		int h = 765;
 		float font_scale = 1.8f;
+		int screen_w = 0; // last known virtual screen size (for detecting display changes)
+		int screen_h = 0;
 	};
 
 	WindowConfig g_window_config;
@@ -74,7 +76,9 @@ namespace fob_gui
 			<< g_window_config.y << "\n"
 			<< g_window_config.w << "\n"
 			<< g_window_config.h << "\n"
-			<< g_window_config.font_scale << "\n";
+			<< g_window_config.font_scale << "\n"
+			<< g_window_config.screen_w << "\n"
+			<< g_window_config.screen_h << "\n";
 	}
 
 	void load_config()
@@ -83,15 +87,52 @@ namespace fob_gui
 		auto cfg_path = get_config_path();
 		std::ifstream ifs(cfg_path);
 		if (!ifs) return;
-		ifs >> g_window_config.x
-			>> g_window_config.y
-			>> g_window_config.w
-			>> g_window_config.h
-			>> g_window_config.font_scale;
-		if (g_window_config.font_scale < 0.5f) g_window_config.font_scale = 0.5f;
-		if (g_window_config.font_scale > 5.0f) g_window_config.font_scale = 5.0f;
-		if (g_window_config.w < 200) g_window_config.w = 200;
-		if (g_window_config.h < 200) g_window_config.h = 200;
+		WindowConfig tmp = g_window_config; // fallback defaults
+		if (!(ifs >> tmp.x >> tmp.y >> tmp.w >> tmp.h >> tmp.font_scale))
+		{
+			// Corrupted config, delete it and keep defaults
+			ifs.close();
+			std::filesystem::remove(cfg_path);
+			return;
+		}
+		// Read optional screen dimensions (added later, may not exist in older configs)
+		if (!(ifs >> tmp.screen_w >> tmp.screen_h))
+		{
+			tmp.screen_w = 0;
+			tmp.screen_h = 0;
+		}
+		if (tmp.font_scale < 0.5f) tmp.font_scale = 0.5f;
+		if (tmp.font_scale > 5.0f) tmp.font_scale = 5.0f;
+		if (tmp.w < 200) tmp.w = 200;
+		if (tmp.h < 200) tmp.h = 200;
+
+		// Validate window position is on current virtual screen (handle
+		// display changes when switching accounts or monitor setups)
+		int vw = GetSystemMetrics(SM_CXVIRTUALSCREEN);
+		int vh = GetSystemMetrics(SM_CYVIRTUALSCREEN);
+		int vx = GetSystemMetrics(SM_XVIRTUALSCREEN);
+		int vy = GetSystemMetrics(SM_YVIRTUALSCREEN);
+
+		// If virtual screen size changed since last run, delete stale imgui.ini
+		// (ImGui stores window positions based on old DisplaySize, causing crashes)
+		if (tmp.screen_w != 0 && tmp.screen_h != 0 &&
+			(tmp.screen_w != vw || tmp.screen_h != vh))
+		{
+			wchar_t exe_path[MAX_PATH];
+			GetModuleFileNameW(nullptr, exe_path, MAX_PATH);
+			auto ini_path = std::filesystem::path(exe_path).replace_extension("ini");
+			std::filesystem::remove(ini_path);
+		}
+		tmp.screen_w = vw;
+		tmp.screen_h = vh;
+
+		if (tmp.x < vx - tmp.w + 50) tmp.x = vx + 50;
+		if (tmp.y < vy) tmp.y = vy;
+		if (tmp.x + 50 > vx + vw) tmp.x = vx + 50;
+		if (tmp.y + 50 > vy + vh) tmp.y = vy;
+		if (tmp.w > vw) tmp.w = vw - 100;
+
+		g_window_config = tmp;
 	}
 
 	float btn_w() { return 120.0f * scale_factor; }
@@ -1904,7 +1945,7 @@ namespace fob_gui
 
 		ImGui::BeginChild("##TopBar", ImVec2(0, topbar_h()), false);
 		{
-			ImGui::Text("TPP-Mod Control");
+			ImGui::Text("TPP Mod Control");
 			ImGui::SameLine();
 			if (ImGui::Button(connected.load() ? "Reconnect" : "Connect"))
 			{
@@ -2164,7 +2205,7 @@ namespace fob_gui
 			GetModuleHandleW(nullptr), nullptr, nullptr, nullptr, nullptr,
 			L"FOBGuiWndClass", nullptr };
 		RegisterClassExW(&wc);
-		g_hwnd = CreateWindowExW(0, wc.lpszClassName, L"TPP-Mod Control",
+		g_hwnd = CreateWindowExW(0, wc.lpszClassName, L"TPP Mod Control",
 			WS_OVERLAPPEDWINDOW,
 			g_window_config.x, g_window_config.y,
 			g_window_config.w, g_window_config.h, nullptr, nullptr, GetModuleHandleW(nullptr), nullptr);
