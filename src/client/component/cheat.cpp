@@ -87,7 +87,7 @@ namespace cheat
 		void modify_stats_internal(game::tpp::mbm::impl::StaffControllerImpl::StaffHeader* header,
 			game::tpp::mbm::impl::StaffControllerImpl::StaffStatusSync* status, const std::uint32_t index)
 		{
-			header->fields.peak_rank = game::tpp::mbm::impl::StaffControllerImpl::RANK_SPP;
+			header->fields.peak_rank = game::tpp::mbm::STAFF_SECTION_RANK_SPP;
 			header->fields.stat_bonus = 3;
 			header->fields.suppress_stats = 0;
 
@@ -105,6 +105,8 @@ namespace cheat
 				break;
 			}
 
+			header->fields.unk = 0;
+
 			status->fields.proficiency = 15;
 			status->fields.ds_medal = 1;
 			status->fields.ds_cross = 1;
@@ -116,84 +118,66 @@ namespace cheat
 			status->fields.unselectable = 0;
 			status->fields.direct_contract = 0;
 			status->fields.enemy = 0;
+			status->fields.designation = 1 + index % 7;
 
 			switch (status->fields.designation)
 			{
-			case game::tpp::mbm::impl::StaffControllerImpl::DESIGNATION_COMBAT:
-			case game::tpp::mbm::impl::StaffControllerImpl::DESIGNATION_SECURITY:
+			case game::tpp::mbm::SECTION_COMBAT:
+			case game::tpp::mbm::SECTION_SECURITY:
 				header->fields.stat_distribution = game::tpp::mbm::impl::StaffControllerImpl::STAT_DIST_COMBAT_PLUS_AND_INTEL_PLUS;
 				break;
-			case game::tpp::mbm::impl::StaffControllerImpl::DESIGNATION_RND:
+			case game::tpp::mbm::SECTION_DEVELOP:
 				header->fields.stat_distribution = game::tpp::mbm::impl::StaffControllerImpl::STAT_DIST_RND_PLUS_AND_BASE_DEV_PLUS;
 				break;
-			case game::tpp::mbm::impl::StaffControllerImpl::DESIGNATION_BASE_DEV:
+			case game::tpp::mbm::SECTION_BASE_DEV:
 				header->fields.stat_distribution = game::tpp::mbm::impl::StaffControllerImpl::STAT_DIST_BASE_DEV_PLUS_AND_INTEL_PLUS;
 				break;
-			case game::tpp::mbm::impl::StaffControllerImpl::DESIGNATION_SUPPORT:
+			case game::tpp::mbm::SECTION_SUPPORT:
 				header->fields.stat_distribution = game::tpp::mbm::impl::StaffControllerImpl::STAT_DIST_SUPPORT_PLUS_AND_COMBAT_PLUS;
 				break;
-			case game::tpp::mbm::impl::StaffControllerImpl::DESIGNATION_INTEL:
+			case game::tpp::mbm::SECTION_SPY:
 				header->fields.stat_distribution = game::tpp::mbm::impl::StaffControllerImpl::STAT_DIST_INTEL_PLUS_AND_COMBAT_PLUS;
 				break;
-			case game::tpp::mbm::impl::StaffControllerImpl::DESIGNATION_MEDICAL:
+			case game::tpp::mbm::SECTION_MEDICAL:
 				header->fields.stat_distribution = game::tpp::mbm::impl::StaffControllerImpl::STAT_DIST_MEDICAL_PLUS_AND_COMBAT_PLUS;
-				break;
-			default:
-			case game::tpp::mbm::impl::StaffControllerImpl::DESIGNATION_BRIG:
-				status->fields.designation = game::tpp::mbm::impl::StaffControllerImpl::DESIGNATION_WAITING_ROOM_1;
 				break;
 			}
 		}
 
-		void modify_stats(game::tpp::mbm::impl::StaffControllerImpl::StaffHeader* header, game::tpp::mbm::impl::StaffControllerImpl::StaffStatusSync* status)
+		void modify_stats(
+			game::tpp::mbm::impl::StaffControllerImpl::StaffHeader* header,
+			game::tpp::mbm::impl::StaffControllerImpl::StaffSeed* seed,
+			game::tpp::mbm::impl::StaffControllerImpl::StaffStatusSync* status)
 		{
-			auto total_staff = 0;
 			for (auto i = 0; i < 3500; i++)
 			{
-				if (status[i].fields.designation >= game::tpp::mbm::impl::StaffControllerImpl::DESIGNATION_UNITS_START &&
-					status[i].fields.designation < game::tpp::mbm::impl::StaffControllerImpl::DESIGNATION_COUNT)
-				{
-					++total_staff;
-					modify_stats_internal(&header[i], &status[i], i);
-				}
+				seed[i].fields.unk1 = 0;
+				seed[i].fields.unk2 = utils::cryptography::random::get_integer();
+				modify_stats_internal(&header[i], &status[i], i);
 			}
 
 			static std::vector<std::uint32_t> required_skills =
 			{
-				{game::tpp::mbm::impl::StaffControllerImpl::SKILL_RANGER_3},
-				{game::tpp::mbm::impl::StaffControllerImpl::SKILL_SENTRY_3},
-				{game::tpp::mbm::impl::StaffControllerImpl::SKILL_DEFENDER_3},
-				{game::tpp::mbm::impl::StaffControllerImpl::SKILL_MEDIC_3},
+				{game::tpp::mbm::STAFF_SKILL_ID_RANGER_LV3},
+				{game::tpp::mbm::STAFF_SKILL_ID_SENTRY_LV3},
+				{game::tpp::mbm::STAFF_SKILL_ID_DEFENDER_LV3},
+				{game::tpp::mbm::STAFF_SKILL_ID_MEDIC_LV3},
 			};
-
-			const auto staff_per_skill = total_staff / required_skills.size();
-			auto assigned_skills = 0;
-			auto current_skill = 0;
-			auto staff_assigned = 0;
 
 			for (auto i = 0; i < 3500; i++)
 			{
-				if (status[i].fields.designation >= game::tpp::mbm::impl::StaffControllerImpl::DESIGNATION_UNITS_START && 
-					status[i].fields.designation <= game::tpp::mbm::impl::StaffControllerImpl::DESIGNATION_UNITS_END)
+				if (i < game::tpp::mbm::STAFF_SKILL_ID_INTERCEPTOR_MISSILE_ENGINEER_LV3 &&
+					i != game::tpp::mbm::STAFF_SKILL_ID_TROUBLEMAKER_HARASSMENT &&
+					i != game::tpp::mbm::STAFF_SKILL_ID_TROUBLEMAKER_INTEMPERATELY &&
+					i != game::tpp::mbm::STAFF_SKILL_ID_TROUBLEMAKER_VIOLENCE &&
+					i != game::tpp::mbm::STAFF_SKILL_ID_NONE)
 				{
-					header[i].fields.skill = required_skills[current_skill];
-
-					++assigned_skills;
-					++staff_assigned;
-					
-					if (assigned_skills >= staff_per_skill && ((total_staff - staff_assigned) >= staff_per_skill))
-					{
-						assigned_skills = 0;
-						++current_skill;
-						if (current_skill >= required_skills.size())
-						{
-							break;
-						}
-					}
-					else if (total_staff == staff_assigned)
-					{
-						break;
-					}
+					header[i].fields.skill = i;
+				}
+				else
+				{
+					const auto skill_index = i % required_skills.size();
+					header[i].fields.skill = required_skills[skill_index];
 				}
 			}
 		}
@@ -203,12 +187,12 @@ namespace cheat
 			const auto system_table = game::fox::GetQuarkSystemTable();
 			if (system_table == nullptr ||
 				system_table->applicationSystem == nullptr ||
-				system_table->applicationSystem->motherBaseManagementSystem == nullptr)
+				system_table->applicationSystem->tpp.motherBaseManagementSystem == nullptr)
 			{
 				return nullptr;
 			}
 
-			return system_table->applicationSystem->motherBaseManagementSystem;
+			return system_table->applicationSystem->tpp.motherBaseManagementSystem;
 		}
 
 		void do_staff_cheat()
@@ -225,8 +209,17 @@ namespace cheat
 				return;
 			}
 
+			mb_sys->staffController->staffCount = 3500;
+
+			for (auto i = 0; i < 7; i++)
+			{
+				mb_sys->staffController->sectionCounts[i] = 500;
+				mb_sys->staffController->sectionLevels[i] = 162;
+			}
+
 			modify_stats(
 				mb_sys->staffController->mbmStaffSvarsHeaders,
+				mb_sys->staffController->mbmStaffSvarsSeeds,
 				mb_sys->staffController->mbmStaffSvarsStatusesSync);
 		}
 
@@ -357,7 +350,6 @@ namespace cheat
 			if (params.size() < 2)
 			{
 				const auto cmd = params.get(0);
-				console::warn("WARNING: modifying resource counts CAN get you banned! (confirmed by experience) use at your own risk.");
 				console::info("usage: %s <resource index> <amount>\n", cmd.data());
 				for (auto i = 0; i < 59; i++)
 				{
@@ -428,6 +420,17 @@ namespace cheat
 
 			const auto mb_sys = get_motherbase_sys();
 			mb_sys->__vftable->SubTppGmp(mb_sys, gmp);
+		}
+
+		utils::hook::detour sub_resource_hook;
+		__int64 sub_resource_stub(__int64 a1, __int64 a2, __int64 a3)
+		{
+			if (var_cheat_no_deployment_cost->current.enabled())
+			{
+				return 0;
+			}
+
+			return sub_resource_hook.invoke<__int64>(a1, a2, a3);
 		}
 	}
 
@@ -575,6 +578,7 @@ namespace cheat
 				mission_preparation_calc_equip_resource_hook.create(SELECT_VALUE_LANG(0x140953AF0, 0x140952A50), mission_preparation_calc_equip_resource_stub);
 				utils::hook::nop(SELECT_VALUE_LANG(0x14095B466, 0x14095A456), 6);
 				utils::hook::call(SELECT_VALUE_LANG(0x14095B466, 0x14095A456), mission_preparation_sub_gmp_stub);
+				sub_resource_hook.create(SELECT_VALUE_LANG(0x140F7DCC0, 0x0), sub_resource_stub);
 			}
 			else
 			{
