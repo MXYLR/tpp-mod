@@ -29,6 +29,7 @@ namespace vars
 	namespace
 	{
 		var_ptr var_cheat_enabled;
+		std::vector<std::function<void(std::string&)>> write_callbacks;
 
 		void reset_cheats()
 		{
@@ -299,7 +300,17 @@ namespace vars
 				buffer.append(utils::string::va("set %s \"%s\"\r\n", var->name.data(), value.data()));
 			}
 
+			for (auto& cb : write_callbacks)
+			{
+				cb(buffer);
+			}
+
 			utils::io::write_file(path, buffer, false);
+	}
+
+		void add_config_write_callback(const std::function<void(std::string&)>& cb)
+		{
+			write_callbacks.emplace_back(cb);
 		}
 
 		bool check_color_component(float v)
