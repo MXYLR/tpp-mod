@@ -4,6 +4,7 @@
 #include "game/game.hpp"
 
 #include "vars.hpp"
+#include "hashes.hpp"
 
 #include <utils/hook.hpp>
 #include <utils/string.hpp>
@@ -183,7 +184,7 @@ namespace ui
 			if (game::environment::is_tpp())
 			{
 				utils::hook::set<std::uint8_t>(SELECT_VALUE_LANG(0x1412D6B97, 0x0), 0xEB);
-				utils::hook::set<std::uint8_t>(SELECT_VALUE_LANG(0x1415EE3ED, 0x0), 0xEB);
+				utils::hook::set<std::uint8_t>(SELECT_VALUE_LANG(0x1415EE402, 0x0), 0xEB);
 				utils::hook::set<std::uint8_t>(SELECT_VALUE_LANG(0x1412D8A87, 0x0), 0xEB);
 			}
 			else
@@ -194,6 +195,7 @@ namespace ui
 
 		void start() override
 		{
+
 		}
 	};
 }
