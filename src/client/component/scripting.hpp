@@ -35,6 +35,12 @@ namespace scripting
 		double get_number() const;
 		bool get_bool() const;
 
+		bool is_bool() const;
+		bool is_number() const;
+		bool is_string() const;
+
+		bool is_true() const;
+
 		std::string to_string() const;
 
 	private:
