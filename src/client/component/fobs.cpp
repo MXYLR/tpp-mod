@@ -513,7 +513,7 @@ namespace fobs
 
 				s.own_lobby_info.name_plate_id = option->name_plate_id;
 
-				const auto script_vars = game::fox::GetQuarkSystemTable()->applicationSystem->scriptVars;
+				const auto script_vars = &game::fox::GetQuarkSystemTable()->applicationSystem->tpp.scriptVars->tpp;
 				std::memcpy(&s.own_lobby_info.emblem.texture_tag, &script_vars->emblemTextureTag, sizeof(game::tpp::mbm::PlayerBasicInfo::Emblem));
 
 				update_lobby(s);
@@ -531,12 +531,12 @@ namespace fobs
 				const auto system_table = game::fox::GetQuarkSystemTable();
 				if (system_table == nullptr ||
 					system_table->applicationSystem == nullptr ||
-					system_table->applicationSystem->motherBaseManagementSystem == nullptr)
+					system_table->applicationSystem->tpp.motherBaseManagementSystem == nullptr)
 				{
 					return;
 				}
 
-				const auto staff_controller = system_table->applicationSystem->motherBaseManagementSystem->staffController;
+				const auto staff_controller = system_table->applicationSystem->tpp.motherBaseManagementSystem->staffController;
 				for (auto i = 0; i < staff_controller->staffCount; i++)
 				{
 					const auto header = staff_controller->mbmStaffSvarsHeaders[i];
@@ -729,24 +729,24 @@ namespace fobs
 			std::memset(fob_target->playerInfos, 0, sizeof(game::tpp::mbm::PlayerBasicInfo) * fob_target->maxPlayers);
 
 			const auto _0 = gsl::finally([&]
-			{
-				add_custom_targets(list->type.data->buffer, fob_target);
-			});
+		{
+			add_custom_targets(list->type.data->buffer, fob_target);
+		});
 
-			const auto cache_players = gsl::finally([&]
+		const auto cache_players = gsl::finally([&]
+		{
+			for (auto i = 0; i < fob_target->maxPlayers; i++)
 			{
-				for (auto i = 0; i < fob_target->maxPlayers; i++)
+				const auto& player_info = fob_target->playerInfos[i];
+				if (player_info.owner_account.id == 0)
 				{
-					const auto& player_info = fob_target->playerInfos[i];
-					if (player_info.owner_account.id == 0)
-					{
-						break;
-					}
-					fob_target::cache_player_info(player_info);
+					break;
 				}
-			});
+				fob_target::cache_player_info(player_info);
+			}
+		});
 
-			if (list->type.data->buffer != "CHALLENGE"s)
+		if (list->type.data->buffer != "CHALLENGE"s)
 			{
 				fob_target_receive_enemy_basic_info_hook.invoke<void>(fob_target, list);
 				return;
@@ -964,3 +964,4 @@ namespace fobs
 }
 
 REGISTER_COMPONENT(fobs::component)
+

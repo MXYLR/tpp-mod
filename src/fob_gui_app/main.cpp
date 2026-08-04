@@ -291,6 +291,10 @@ namespace fob_gui
 			{"ui_draw_fps", "1"},
 			{"ui_draw_ping", "1"},
 			{"ui_skip_intro", "1"},
+			{"ui_mb_color", "0.05 0.25 0.35 1.0"},
+			{"ui_color_tweaks", "0"},
+			{"ui_disable_noise", "0"},
+			{"ui_disable_dot_pattern", "0"},
 		}},
 		{"Performance", {
 			{"com_worker_count", "4"},
@@ -1595,6 +1599,9 @@ namespace fob_gui
 			{"cheat_add_processing_resource", "", true},
 			{"cheat_add_usable_resource", "", true},
 			{"cheat_restore_quiet", "", true},
+			{"cheat_develop_limit", "", true},
+			{"cheat_no_deployment_cost", "1"},
+			{"cheat_unlockall_gear", "1"},
 		};
 
 		static const bool cheat_needs_param[] = {
@@ -1602,6 +1609,7 @@ namespace fob_gui
 			false,
 			true, true, true,
 			true, true, true, false,
+			true, true, true,
 		};
 
 		static const char* cheat_param_hints[] = {
@@ -1615,21 +1623,24 @@ namespace fob_gui
 			"index amount (e.g. 0 5000)",
 			"index amount (e.g. 0 5000)",
 			"",
+			"max items (e.g. 5)",
+			"0 or 1",
+			"0 or 1",
 		};
 
-		static char cheat_param_buf[10][128] = {};
+		static char cheat_param_buf[13][128] = {};
 
 		ImGui::OpenPopup("Cheats");
 		ImVec2 center = ImGui::GetMainViewport()->GetCenter();
 		ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-		ImGui::SetNextWindowSize(ImVec2(popup_w(), popup_h() + 60), ImGuiCond_Appearing);
+		ImGui::SetNextWindowSize(ImVec2(popup_w(), popup_h() + 90), ImGuiCond_Appearing);
 
 		if (ImGui::BeginPopupModal("Cheats", nullptr, ImGuiWindowFlags_None))
 		{
 			if (ImGui::Button("Apply ALL##cheats", ImVec2(btn_w() * 1.5f, btn_h())))
 			{
 				int count = 0;
-				for (int i = 0; i < 10; i++)
+				for (int i = 0; i < IM_ARRAYSIZE(cheat_options); i++)
 				{
 					const auto& opt = cheat_options[i];
 					std::string cmd;
@@ -1659,7 +1670,7 @@ namespace fob_gui
 			float child_h = ImGui::GetContentRegionAvail().y - 60 * scale_factor;
 			if (ImGui::BeginChild("##cheats_list", ImVec2(0, child_h), true))
 			{
-				for (int i = 0; i < 10; i++)
+				for (int i = 0; i < IM_ARRAYSIZE(cheat_options); i++)
 				{
 					const auto& opt = cheat_options[i];
 					ImGui::PushID(i);
@@ -1718,7 +1729,7 @@ namespace fob_gui
 			if (ImGui::Button("Close##cheats", ImVec2(btn_w(), btn_h())))
 			{
 				show_cheats_dialog.store(false);
-				for (int i = 0; i < 10; i++) cheat_param_buf[i][0] = '\0';
+				for (int i = 0; i < IM_ARRAYSIZE(cheat_param_buf); i++) cheat_param_buf[i][0] = '\0';
 				settings_status_msg.clear();
 				ImGui::CloseCurrentPopup();
 			}
