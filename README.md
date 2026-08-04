@@ -20,9 +20,10 @@ For older builds go here:
 | mgsvtpp.exe (jpn, 1.0.15.4) | 54BC743D1D7D98678EF4CC8D5BC98439F92AA1F7 | ❌ |
 | mgsvmgo.exe (jpn, 1.1.2.8) | 505BBF337DED2DFDD4F86FAAA2F4A9DC3CE935B0 | ❌ |
 
-- Download [dinput8.dll](https://github.alicent.cat/tpp-mod/latest/dinput8.dll) and copy it to the game folder.  
+- Download [dinput8.dll](https://github.com/MXYLR/tpp-mod/releases/latest/download/dinput8.dll) and copy it to the game folder.
+- Download [fob-gui.exe](https://github.com/MXYLR/tpp-mod/releases/latest/download/fob-gui.exe) and place it next to the game executable (optional, used by the FOB GUI).
 
-Configuration files are stored in `%localappdata%\tpp-mod`
+Configuration files are stored in the game folder (e.g. `config/config_tpp.cfg`).
 
 ## Features
 
@@ -44,6 +45,7 @@ The performance and FPS drop issues (notably the avatar edit menu, but also exte
 
 ### Misc
 - discord rich presence
+- FOB GUI (fob-gui.exe): manage FOBs and use wormhole communication via named pipes
 - unlock fps and custom fps capping
 - fps and ping counter
 - mgo text chat
@@ -118,12 +120,16 @@ Can be executed from the console or in game console
 - `clearmutes`: unmute all players
 
 ### Variable list
-similar to cod dvars, can be set through the console or through the config files `%localappdata%/tpp-mod/config/`
+similar to cod dvars, can be set through the console or through the config files in the game folder `config/`
 (type their name in the console for a description)
 
 - `net_custom_server`
 - `net_channel`
 - `discord_enable`
+- `ui_mb_color`
+- `ui_color_tweaks`
+- `ui_disable_noise`
+- `ui_disable_dot_pattern`
 - `con_input_box_color`
 - `con_input_hint_box_color`
 - `con_output_bar_color`
@@ -170,6 +176,10 @@ similar to cod dvars, can be set through the console or through the config files
 - `player_ramble_speed_patch`
 - `ui_skip_intro`
 - `staff_cheat`
+- `cheat_develop_limit`
+- `cheat_no_deployment_cost`
+- `cheat_unlockall_gear`
+- `cheat_unlockall_server_items`
 
 ## Launch parameters
 
