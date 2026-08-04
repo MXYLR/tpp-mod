@@ -475,7 +475,11 @@ namespace binds
 		std::string get_config_file_path()
 		{
 			static const auto file = SELECT_VALUE_NOLANG("config/keys_tpp.cfg", "config/keys_mgo.cfg");
-			return (utils::properties::get_appdata_path() / file).generic_string();
+			// Store config in game root directory instead of AppData
+			wchar_t exe_path[MAX_PATH];
+			GetModuleFileNameW(nullptr, exe_path, MAX_PATH);
+			auto game_root = std::filesystem::path(exe_path).parent_path();
+			return (game_root / file).generic_string();
 		}
 
 		void bind_key(const std::string& key, const std::string& cmd, const bind_mode_t mode)

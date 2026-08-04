@@ -36,7 +36,6 @@ namespace patches
 
 		void thread_sleep()
 		{
-			std::this_thread::yield();
 		}
 
 		unsigned int get_processor_count()
@@ -156,7 +155,7 @@ namespace patches
 		const char* get_persona_name_stub(game::ISteamFriends* this_)
 		{
 			static char buffer[0x200]{};
-			const auto name = var_name->current.get_string();
+			const auto& name = var_name->current.get_string();
 			strncpy_s(buffer, sizeof(buffer), name.data(), name.size());
 			return buffer;
 		}
@@ -467,7 +466,7 @@ namespace patches
 	public:
 		void pre_load() override
 		{
-			var_worker_count = vars::register_int("com_worker_count", 4, 2, std::numeric_limits<int>::max(),
+			var_worker_count = vars::register_int("com_worker_count", 4, 2, std::thread::hardware_concurrency(),
 				vars::var_flag_saved | vars::var_flag_latched, "maxiumum number of job executor worker threads");
 
 			var_unlock_fps = vars::register_bool("com_unlock_fps", false, 
@@ -521,7 +520,7 @@ namespace patches
 						return;
 					}
 
-					const auto name = var_name->current.get_string();
+					const auto& name = var_name->current.get_string();
 					strncpy_s(inst->ptr1->ptr1->ptr2->name, sizeof(inst->ptr1->ptr1->ptr2->name), name.data(), name.size());
 				};
 			}
@@ -572,3 +571,4 @@ namespace patches
 }
 
 REGISTER_COMPONENT(patches::component)
+

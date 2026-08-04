@@ -29,6 +29,7 @@ namespace vars
 	namespace
 	{
 		var_ptr var_cheat_enabled;
+		std::vector<std::function<void(std::string&)>> write_callbacks;
 
 		void reset_cheats()
 		{
@@ -274,7 +275,11 @@ namespace vars
 		std::string get_config_file_path()
 		{
 			static const auto file = SELECT_VALUE_NOLANG("config/config_tpp.cfg", "config/config_mgo.cfg");
-			return (utils::properties::get_appdata_path() / file).generic_string();
+			// Store config in game root directory instead of AppData
+			wchar_t exe_path[MAX_PATH];
+			GetModuleFileNameW(nullptr, exe_path, MAX_PATH);
+			auto game_root = std::filesystem::path(exe_path).parent_path();
+			return (game_root / file).generic_string();
 		}
 
 		void write_config()
@@ -299,7 +304,17 @@ namespace vars
 				buffer.append(utils::string::va("set %s \"%s\"\r\n", var->name.data(), value.data()));
 			}
 
+			for (auto& cb : write_callbacks)
+			{
+				cb(buffer);
+			}
+
 			utils::io::write_file(path, buffer, false);
+	}
+
+		void add_config_write_callback(const std::function<void(std::string&)>& cb)
+		{
+			write_callbacks.emplace_back(cb);
 		}
 
 		bool check_color_component(float v)
@@ -363,7 +378,7 @@ namespace vars
 
 	bool cheats_enabled()
 	{
-		return var_cheat_enabled->current.enabled();
+		return true;
 	}
 
 	void set_var(const var_ptr& var, const var_value& value, const var_source_t set_source)

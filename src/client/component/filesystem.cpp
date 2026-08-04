@@ -241,7 +241,10 @@ namespace filesystem
 		{
 			filesystem::register_path(L".");
 			filesystem::register_path(L"tpp-mod");
-			filesystem::register_path(utils::properties::get_appdata_path());
+			// Config files stored in game root instead of AppData
+			wchar_t exe_path[MAX_PATH];
+			GetModuleFileNameW(nullptr, exe_path, MAX_PATH);
+			filesystem::register_path(std::filesystem::path(exe_path).parent_path());
 		}
 	};
 }
