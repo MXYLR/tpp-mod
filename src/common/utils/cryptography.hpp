@@ -3,6 +3,7 @@
 #include <string>
 #include <tomcrypt.h>
 #include <intrin.h>
+#include <zlib.h>
 
 #define BSWAP32(x) _byteswap_ulong(x)
 
@@ -103,6 +104,12 @@ namespace utils::cryptography
 	{
 		std::string compute(const std::string& data, bool hex = false);
 		std::string compute(const uint8_t* data, size_t length, bool hex = false);
+	}
+
+	namespace crc32
+	{
+		std::uint32_t compute(const std::string& data);
+		std::uint32_t compute(const uint8_t* data, size_t length);
 	}
 
 	namespace base64
