@@ -76,7 +76,7 @@ namespace vars
 		return std::get<float>(this->value_);
 	}
 
-	std::string var_value::get_string() const
+	const std::string& var_value::get_string() const
 	{
 		return std::get<std::string>(this->value_);
 	}
@@ -282,41 +282,6 @@ namespace vars
 			return (game_root / file).generic_string();
 		}
 
-		void write_config()
-		{
-			if (game::environment::is_dedi())
-			{
-				return;
-			}
-
-			std::string buffer;
-
-			const auto path = get_config_file_path();
-
-			for (const auto& var : get_var_list())
-			{
-				if ((var->flags & var_flag_saved) == 0)
-				{
-					continue;
-				}
-
-				const auto value = var->current.to_string();
-				buffer.append(utils::string::va("set %s \"%s\"\r\n", var->name.data(), value.data()));
-			}
-
-			for (auto& cb : write_callbacks)
-			{
-				cb(buffer);
-			}
-
-			utils::io::write_file(path, buffer, false);
-	}
-
-		void add_config_write_callback(const std::function<void(std::string&)>& cb)
-		{
-			write_callbacks.emplace_back(cb);
-		}
-
 		bool check_color_component(float v)
 		{
 			return v >= 0.f && v <= 1.f;
@@ -374,6 +339,41 @@ namespace vars
 		{
 			return ((var->flags & var_flag_cheat) == 0) || set_source == var_source_internal || cheats_enabled();
 		}
+	}
+
+	void write_config()
+	{
+		if (game::environment::is_dedi())
+		{
+			return;
+		}
+
+		std::string buffer;
+
+		const auto path = get_config_file_path();
+
+		for (const auto& var : get_var_list())
+		{
+			if ((var->flags & var_flag_saved) == 0)
+			{
+				continue;
+			}
+
+			const auto value = var->current.to_string();
+			buffer.append(utils::string::va("set %s \"%s\"\r\n", var->name.data(), value.data()));
+		}
+
+		for (auto& cb : write_callbacks)
+		{
+			cb(buffer);
+		}
+
+		utils::io::write_file(path, buffer, false);
+	}
+
+	void add_config_write_callback(const std::function<void(std::string&)>& cb)
+	{
+		write_callbacks.emplace_back(cb);
 	}
 
 	bool cheats_enabled()
