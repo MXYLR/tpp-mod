@@ -15,6 +15,7 @@
 #include <utils/cryptography.hpp>
 #include <utils/http.hpp>
 #include <utils/compression.hpp>
+#include <utils/properties.hpp>
 
 namespace custom_server
 {
@@ -49,11 +50,63 @@ namespace custom_server
 			steam_storage_vftbl* vftbl;
 		};
 
-		std::string get_custom_server_data_folder()
+		std::string get_url_hash()
 		{
 			const auto url_hash = utils::cryptography::sha1::compute(custom_url, true).substr(0, 8);
+			return url_hash;
+		}
+
+		std::string get_legacy_custom_server_data_folder()
+		{
+			const auto url_hash = get_url_hash();
 			const auto folder = std::format("tpp-mod\\steam_storage\\server-{}", url_hash);
 			return folder;
+		}
+
+		std::uint64_t get_user_steamid()
+		{
+			const auto steam_user = (*game::SteamUser)();
+			game::steam_id steam_id{};
+			steam_user->__vftable->GetSteamID(steam_user, &steam_id);
+			return steam_id.bits;
+		}
+
+		std::string get_base_path()
+		{
+			const auto steam_id = get_user_steamid();
+			const auto appdata = utils::properties::get_appdata_path();
+			return std::format("{}\\userdata\\{}", appdata.generic_string(), steam_id);
+		}
+
+		std::string get_custom_server_data_folder()
+		{
+			const auto url_hash = get_url_hash();
+			return std::format("{}\\steam_storage\\server-{}", get_base_path(), url_hash);
+		}
+
+		std::string get_auth_token_save_path()
+		{
+			const auto url_hash = get_url_hash();
+			return std::format("{}\\auth_tokens\\{}", get_base_path(), url_hash);
+		}
+
+		void migrate_from_legacy_folder()
+		{
+			const auto legacy_folder = get_legacy_custom_server_data_folder();
+			const auto new_folder = get_custom_server_data_folder();
+			if (utils::io::directory_exists(legacy_folder) && !utils::io::directory_exists(new_folder))
+			{
+				utils::io::create_directory(new_folder);
+				utils::io::copy_folder(legacy_folder, new_folder);
+				utils::io::remove_directory(legacy_folder);
+			}
+
+			const auto appdata = utils::properties::get_appdata_path();
+			const auto old_auth_tokens_path = std::format("{}\\auth_tokens", appdata.generic_string());
+			if (utils::io::directory_exists(old_auth_tokens_path))
+			{
+				utils::io::remove_directory(old_auth_tokens_path);
+			}
 		}
 
 		std::string get_custom_server_data_file_path(const std::string& file_name)
@@ -172,10 +225,95 @@ namespace custom_server
 			return CreateFileW(new_path.data(), desired_access, share_mode, security_attributes, creation_disp, flags, template_file);
 		}
 
+		struct auth_ticket_custom_t
+		{
+			std::uint64_t account_id;
+			char auth_token[32];
+		};
+
+		void clear_command_line()
+		{
+			const auto process_params = NtCurrentTeb()->ProcessEnvironmentBlock->ProcessParameters;
+			SecureZeroMemory(process_params->CommandLine.Buffer, process_params->CommandLine.Length);
+		}
+
+		std::optional<std::string> get_auth_token(bool from_file = true)
+		{
+			const auto auth_token = utils::flags::get_flag("auth-token");
+			if (auth_token.has_value() && auth_token->size() == sizeof(auth_ticket_custom_t::auth_token))
+			{
+				clear_command_line();
+				return auth_token;
+			}
+
+			if (!from_file)
+			{
+				return {};
+			}
+
+			const auto path = get_auth_token_save_path();
+			std::string data;
+			if (utils::io::read_file(path, &data))
+			{
+				const auto token = utils::string::trim(data);
+				if (token.size() == sizeof(auth_ticket_custom_t::auth_token))
+				{
+					return {token};
+				}
+			}
+
+			return {};
+		}
+
+		utils::hook::detour get_auth_session_ticket_hook;
+		unsigned int get_auth_session_ticket_stub(game::ISteamUser* this_, void* data, int max_size, int* ticket_size)
+		{
+			const auto auth_token = get_auth_token();
+			if (!auth_token.has_value() || 
+				auth_token->size() != sizeof(auth_ticket_custom_t::auth_token) || 
+				max_size < sizeof(auth_ticket_custom_t))
+			{
+				return get_auth_session_ticket_hook.invoke<unsigned int>(this_, data, max_size, ticket_size);
+			}
+
+			game::steam_id steam_id{};
+			this_->__vftable->GetSteamID(this_, &steam_id);
+
+			utils::io::write_file(get_auth_token_save_path(), auth_token.value());
+
+			const auto ticket = reinterpret_cast<auth_ticket_custom_t*>(data);
+			ticket->account_id = steam_id.bits;
+			std::memcpy(ticket->auth_token, auth_token->data(), sizeof(auth_ticket_custom_t::auth_token));
+			*ticket_size = sizeof(auth_ticket_custom_t);
+
+			static char dummy_ticket[512]{};
+			static int dummy_ticket_size{};
+			return get_auth_session_ticket_hook.invoke<unsigned int>(this_, dummy_ticket, 512, &dummy_ticket_size);
+		}
+
+		void hook_steam_user()
+		{
+			migrate_from_legacy_folder();
+
+			const auto folder = get_custom_server_data_folder();
+			utils::io::write_file(std::format("{}\\server_url.txt", folder), custom_url);
+
+			const auto steam_user = (*game::SteamUser)();
+			get_auth_session_ticket_hook.create(steam_user->__vftable->GetAuthSessionTicket, get_auth_session_ticket_stub);
+		}
+
+		void set_command_line_stub(char* buffer, size_t size, const char* arg1, const char* arg2)
+		{
+			const auto auth_token = get_auth_token(false);
+			if (auth_token.has_value())
+			{
+				snprintf(buffer, size, "-auth-token %s", auth_token->data());
+			}
+		}
+
 		void apply_custom_server()
 		{
-			const auto custom_server = var_custom_server->current.get_string();
-
+			const auto& custom_server = var_custom_server->current.get_string();
 			if (custom_server.empty())
 			{
 				return;
@@ -191,13 +329,13 @@ namespace custom_server
 
 				utils::hook::set(SELECT_VALUE_LANG(0x14208D260, 0x14E1300B8), create_file_stub);
 
-				const auto folder = get_custom_server_data_folder();
-				utils::io::write_file(std::format("{}\\server_url.txt", folder), custom_url);
-
 				utils::hook::jump(SELECT_VALUE_LANG(0x14016FC2B, 0x14357A1FB), utils::hook::assemble(steam_storage_read_file_stub), true);
 			}
 
 			utils::hook::inject(SELECT_VALUE(0x1407D346C, 0x140572D76, 0x1407D23EC, 0x1405724C6) + 3, custom_url);
+			utils::hook::call(SELECT_VALUE(0x14052EF25, 0x1402DCE75, 0x0, 0x0), set_command_line_stub);
+
+			scheduler::once(hook_steam_user, scheduler::net);
 		}
 
 		std::wstring parse_proxy_url(const std::string& url)
@@ -216,7 +354,7 @@ namespace custom_server
 		{
 			auto result = WinHttpSetOption(handle, option, buffer, buffer_length);
 
-			const auto url = var_net_proxy_url->current.get_string();
+			const auto& url = var_net_proxy_url->current.get_string();
 			if (!url.empty())
 			{
 				auto url_w = parse_proxy_url(url);
@@ -234,29 +372,10 @@ namespace custom_server
 			return result;
 		}
 
-		BOOL win_http_crack_url_stub(LPCWSTR url, DWORD length, DWORD flags, LPURL_COMPONENTS url_components)
-		{
-			const auto domain = var_net_server_url_ovveride->current.get_string();
-			const auto pos = StrStrW(url, L"/tppstm");
-
-			std::wstring new_url;
-			if (!domain.empty() && !is_using_custom_server())
-			{
-				new_url = utils::string::convert(domain);
-				new_url += (url + (pos - url));
-				url = new_url.data();
-			}
-
-			return WinHttpCrackUrl(url, length, flags, url_components);
-		}
-
 		void patch_win_http()
 		{
 			utils::hook::nop(SELECT_VALUE(0x141A5C9F6, 0x1414AE416, 0x0, 0x0), 6);
 			utils::hook::call(SELECT_VALUE(0x141A5C9F6, 0x1414AE416, 0x0, 0x0), win_http_set_option_stub);
-
-			utils::hook::nop(SELECT_VALUE(0x141A5CA98, 0x1414AE4B8, 0x0, 0x0), 6);
-			utils::hook::call(SELECT_VALUE(0x141A5CA98, 0x1414AE4B8, 0x0, 0x0), win_http_crack_url_stub);
 		}
 
 		std::uint8_t* get_static_key()
@@ -392,7 +511,7 @@ namespace custom_server
 		headers["Connection"] = "Keep-Alive";
 		headers["Content-Type"] = "application/x-www-form-urlencoded";
 
-		const auto proxy_url = var_net_proxy_url->current.get_string();
+		const auto& proxy_url = var_net_proxy_url->current.get_string();
 		const auto result = utils::http::post_data(url->data->buffer, post_data, headers, {}, proxy_url);
 		if (!result.has_value())
 		{
@@ -426,7 +545,6 @@ namespace custom_server
 		{
 			var_custom_server = vars::register_string("net_custom_server", "", vars::var_flag_saved | vars::var_flag_latched, "custom server url (empty = disabled)");
 			var_net_proxy_url = vars::register_string("net_proxy_url", "", vars::var_flag_saved, "proxy url for backend server (example: http://1.2.3.4:1234 empty = disabled)");
-			var_net_server_url_ovveride = vars::register_string("net_server_base_url_ovveride", "", vars::var_flag_saved, "override the backend server's base url (empty = disabled)");
 		}
 
 		void start() override

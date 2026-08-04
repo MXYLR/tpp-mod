@@ -868,12 +868,20 @@ namespace lui::scripting
 				return sol::lua_nil;
 			};
 
-			state["game"]["localize"] = [](const std::string& str)
-			{
-				game::fox::StringId str_id{};
-				game::tpp::ui::utility::GetStringId(&str_id, str.data());
-				return game::tpp::ui::utility::GetLangText(str_id);
-			};
+			state["game"]["localize"] = sol::overload(
+				[](const std::uint64_t id)
+				{
+					game::fox::StringId str_id{};
+					str_id.id = id;
+					return game::tpp::ui::utility::GetLangText(str_id);
+				},
+				[](const std::string& str)
+				{
+					game::fox::StringId str_id{};
+					game::tpp::ui::utility::GetStringId(&str_id, str.data());
+					return game::tpp::ui::utility::GetLangText(str_id);
+				}
+			);
 
 			state["game"]["getcurrentlocationid"] = []()
 			{
@@ -904,6 +912,44 @@ namespace lui::scripting
 				[](const std::uint64_t hash)
 				{
 					return utils::get_texture_resource(hash);
+				}
+			);
+
+			const auto get_palette_color = [](const std::uint32_t hash, const sol::this_state s)
+			{
+				game::fox::Color color{};
+				const auto uix_utility = game::fox::uix::impl::GetUixUtilityToFeedQuarkEnvironment();
+
+				game::fox::StringId id{};
+				id.f.l = hash;
+
+				if (game::environment::is_tpp())
+				{
+					uix_utility->__vftable->tpp.GetPaletteColor(uix_utility, &color, id);
+				}
+				else
+				{
+					uix_utility->__vftable->mgo.GetPaletteColor(uix_utility, &color, id);
+				}
+
+				auto color_v = sol::table::create(s.lua_state());
+				color_v["r"] = color.values[0];
+				color_v["g"] = color.values[1];
+				color_v["b"] = color.values[2];
+				color_v["a"] = color.values[3];
+
+				return color_v;
+			};
+
+			state["game"]["getpalettecolor"] = sol::overload(
+				[&](const std::string& name, const sol::this_state s)
+				{
+					const auto hash = game::fox::FoxStrHash32(name.data(), name.size());
+					return get_palette_color(hash.f.l, s);
+				},
+				[&](const std::uint32_t hash, const sol::this_state s)
+				{
+					return get_palette_color(hash, s);
 				}
 			);
 
@@ -1195,6 +1241,7 @@ namespace lui::scripting
 			state.open_libraries
 			(
 				sol::lib::base,
+				sol::lib::package,
 				sol::lib::string,
 				sol::lib::math,
 				sol::lib::table

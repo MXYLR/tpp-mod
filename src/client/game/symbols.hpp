@@ -18,6 +18,11 @@ namespace game
 
 		WEAK symbol<game::fox::StringId(const char*, size_t)> FoxStrHash32{0x1400234E0, 0x140022F50, 0x140023220, 0x140022FD0};
 
+		namespace Array_
+		{
+			WEAK symbol<bool(Array<Path>*, Path*)> Path_PushBack{0x0, 0x1400ACB70, 0x0, 0x0};
+		}
+
 		namespace AssetConfiguration_
 		{
 			WEAK symbol<SharedString*()> GetLanguage{0x140170B50, 0x1401733A0, 0x1401711F0, 0x140172770};
@@ -52,6 +57,17 @@ namespace game
 
 		namespace fs
 		{
+			namespace FileLocationManager_
+			{
+				WEAK symbol<unsigned int(MountPoint*, unsigned int)> SetIoHandleCount{0x14004A200, 0x14004A2E0, 0x0, 0x0};
+			}
+
+			namespace MountPoint_
+			{
+				WEAK symbol<MountPoint* (const char*, const char*, __int64, int)> CreateWithPackFile{0x140048E20, 0x140049150, 0x0, 0x0};
+				WEAK symbol<void(MountPoint*)> Destroy{0x140049270, 0x140049510, 0x0, 0x0};
+			}
+
 			namespace PathCodeImpl_
 			{
 				WEAK symbol<__int64(const char*)> FromString{0x14003DB30, 0x14003D560, 0x14003DE50, 0x14003DC30};
