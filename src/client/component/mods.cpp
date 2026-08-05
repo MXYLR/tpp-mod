@@ -166,13 +166,25 @@ namespace mods
             }
         }
 
+        void register_mod_search_paths(const std::string& path, const bool add)
+        {
+            if (add)
+            {
+                filesystem::register_path(path);
+            }
+            else
+            {
+                filesystem::unregister_path(path);
+            }
+        }
+
         void clear_mod(bool& needs_restart)
         {
             if (current_mod.path.has_value())
             {
                 const auto& path = current_mod.path.value();
                 console::info("[Mods] Unloading mod: %s\n", path.data());
-                filesystem::unregister_path(path);
+                register_mod_search_paths(path, false);
             }
 
             needs_restart |= (current_mod.flags & MOD_FLAG_NEEDS_RESTART) != 0;
@@ -211,7 +223,7 @@ namespace mods
             current_mod = {};
             current_mod.path.emplace(normal_path);
 
-            filesystem::register_path(normal_path);
+            register_mod_search_paths(normal_path, true);
 
             const auto info_path = std::format("{}\\mod.json", normal_path);
 
@@ -591,7 +603,7 @@ namespace mods
             }
 
             const auto num_files = utils::steam::get_lobby_data<std::int32_t>(lobby_id, "mod_file_num");
-            if (num_files > 8)
+            if (num_files < 0 || num_files > 8)
             {
                 error = std::format("Server has too many mod files ({})", num_files);
                 return false;
@@ -735,7 +747,7 @@ namespace mods
 
         bool wait_for_hash_jobs_stub(__int64 a1)
         {
-            const auto result = utils::hook::invoke<char>(SELECT_VALUE_LANG(0x140370920, 0x0), a1);
+            const auto result = utils::hook::invoke<char>(SELECT_VALUE_LANG(0x1403708E0, 0x0), a1);
             if (!matchmaking::is_host())
             {
                 return result;
@@ -939,11 +951,20 @@ namespace mods
             if (game::environment::is_mgo())
             {
                 var_sv_base_url = vars::register_string("sv_base_url", "", vars::var_flag_saved, "base url for server mod downloading (sent to lobby members)");
-                utils::hook::call(SELECT_VALUE_LANG(0x140893BBF, 0x0), wait_for_hash_jobs_stub);
+                utils::hook::call(SELECT_VALUE_LANG(0x140893B9F, 0x0), wait_for_hash_jobs_stub);
             }
 
             fs_module_init_hook.create(SELECT_VALUE(0x14003A960, 0x14003A830, 0x0, 0x0), fs_module_init_stub);
             create_pack_mountpoint_hook.create(game::fox::fs::MountPoint_::CreateWithPackFile, create_pack_mountpoint_stub);
+        }
+
+        void post_load() override
+        {
+            const auto& fs_mod = var_fs_mod_path->latched.get_string();
+            if (!fs_mod.empty())
+            {
+                register_mod_search_paths(fs_mod, true);
+            }
         }
 
         void start() override
