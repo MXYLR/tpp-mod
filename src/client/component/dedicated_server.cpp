@@ -408,7 +408,7 @@ namespace dedicated_server
 
 		void start() override
 		{
-			filesystem::register_resource_file("config\\server.cfg", RESOURCE_SERVER_CFG);
+			filesystem::register_resource_file("server.cfg", RESOURCE_SERVER_CFG);
 
 			if (!game::environment::is_mgo())
 			{
