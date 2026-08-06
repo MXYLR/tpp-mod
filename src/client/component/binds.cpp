@@ -474,7 +474,7 @@ namespace binds
 
 		std::string get_config_file_path()
 		{
-			static const auto file = SELECT_VALUE_NOLANG("config/keys_tpp.cfg", "config/keys_mgo.cfg");
+			static const auto file = SELECT_VALUE_NOLANG("keys_tpp.cfg", "keys_mgo.cfg");
 			// Store config in game root directory instead of AppData
 			wchar_t exe_path[MAX_PATH];
 			GetModuleFileNameW(nullptr, exe_path, MAX_PATH);
@@ -620,8 +620,8 @@ namespace binds
 				return;
 			}
 
-			filesystem::register_resource_file("config\\keys_tpp.cfg", RESOURCE_KEYS_TPP);
-			filesystem::register_resource_file("config\\keys_mgo.cfg", RESOURCE_KEYS_MGO);
+			filesystem::register_resource_file("keys_tpp.cfg", RESOURCE_KEYS_TPP);
+			filesystem::register_resource_file("keys_mgo.cfg", RESOURCE_KEYS_MGO);
 
 			command::add("unbindall", [](const command::params& params)
 			{

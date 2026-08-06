@@ -253,7 +253,7 @@ namespace command
 
 		bool exec_cfg(const std::string& name)
 		{
-			const auto file = utils::string::va("config\\%s", name.data());
+			const auto file = utils::string::va("%s", name.data());
 			std::string data;
 			if (!filesystem::read_file(file, &data))
 			{
