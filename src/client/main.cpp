@@ -1,11 +1,14 @@
 #include <std_include.hpp>
 
 #include "loader/component_loader.hpp"
+#include "component/scheduler.hpp"
+#include "component/console.hpp"
 #include "game/game.hpp"
 
 #include <utils/nt.hpp>
 #include <utils/io.hpp>
 #include <utils/string.hpp>
+#include <utils/hook.hpp>
 
 namespace
 {
@@ -41,13 +44,20 @@ namespace
 		enable_dpi_awareness();
 		game::environment::detect_version();
 
-		if (!component_loader::pre_load() || !component_loader::post_load())
-		{
-			throw std::runtime_error("premature shutdown");
-		}
+		console::initialize();
+
+		utils::hook::detour::enable_queue();
+
+		component_loader::pre_load();
+		component_loader::post_load();
 
 		component_loader::start();
 		component_loader::post_start();
+
+		utils::hook::detour::apply_queued();
+		utils::hook::detour::disable_queue();
+
+		scheduler::once(component_loader::game_initialized, scheduler::main);
 	}
 
 	void destroy()

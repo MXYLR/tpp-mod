@@ -55,20 +55,30 @@ namespace scripting
 		return this->instance_.lua->state;
 	}
 
+	lua_scoped_global_policy::lua_scoped_global_policy(game::lua::lua_State* state, int a2)
+	{
+		game::fox::LuaScopedGlobalPolicy_::LuaScopedGlobalPolicy_(&this->instance_, state, a2);
+	}
+
+	lua_scoped_global_policy::~lua_scoped_global_policy()
+	{
+		game::fox::LuaScopedGlobalPolicy_::LuaScopedGlobalPolicy__destructor(&this->instance_);
+	}
+
 	lua_value::lua_value(game::lua::lua_State* state, int index)
 	{
-		this->type_ = game::lua::lua_type(state, -1);
+		this->type_ = game::lua::lua_type(state, index);
 		size_t len{};
 		switch (this->type_)
 		{
 		case LUA_TBOOLEAN:
-			this->value_ = game::lua::lua_toboolean(state, -1);
+			this->value_ = game::lua::lua_toboolean(state, index);
 			break;
 		case LUA_TNUMBER:
-			this->value_ = game::lua::lua_tonumber(state, -1);
+			this->value_ = game::lua::lua_tonumber(state, index);
 			break;
 		case LUA_TSTRING:
-			this->value_ = game::lua::lua_tolstring(state, -1, &len);
+			this->value_ = game::lua::lua_tolstring(state, index, &len);
 			break;
 		}
 	}
@@ -131,14 +141,18 @@ namespace scripting
 			return "[userdata]";
 		case LUA_TFUNCTION:
 			return "[function]";
+		case LUA_TLIGHTUSERDATA:
+			return "[lightuserdata]";
+		case LUA_TTHREAD:
+			return "[thread]";
 		}
 
-		return "nil";
+		return "[unknown]";
 	}
 
 	namespace
 	{
-		utils::hook::detour lua_init_hook;
+		utils::hook::detour tpp_game_core_init_hook;
 		utils::hook::detour lua_new_state_hook;
 
 		bool loading_custom_script = false;
@@ -148,7 +162,7 @@ namespace scripting
 
 		void print_loading_script(const std::string& name)
 		{
-			console::info("Loading custom lua script '%s'\n", name.data());
+			console::info("[lua] Loading custom lua script '%s'\n", name.data());
 		}
 
 		void load_script(const std::string& path)
@@ -167,14 +181,17 @@ namespace scripting
 
 			print_loading_script(path);
 
-			const auto state = (*game::s_instances)->state;
-			if (game::lua::luaL_loadbuffer(state, data.data(), data.size(), path.data()) != 0 ||
-				game::lua::lua_pcall(state, 0, 0, 0) != 0)
+			const auto lock = acquire_lock();
+
+			lua_scoped_global_policy policy{lock->get_lua_state(), 0};
+
+			if (game::lua::luaL_loadbuffer(lock->get_lua_state(), data.data(), data.size(), path.data()) != 0 ||
+				game::lua::lua_pcall(lock->get_lua_state(), 0, 0, 0) != 0)
 			{
 				size_t size{};
-				const auto error = game::lua::lua_tolstring(state, -1, &size);
+				const auto error = game::lua::lua_tolstring(lock->get_lua_state(), -1, &size);
 				console::error("Error loading script \"%s\": %s\n", path.data(), error);
-				game_lua_pop(state, 1);
+				game_lua_pop(lock->get_lua_state(), 1);
 			}
 		}
 
@@ -188,22 +205,18 @@ namespace scripting
 			const auto scripts = utils::io::list_files(script_dir);
 			for (const auto& script : scripts)
 			{
-				std::string data{};
-				if (std::filesystem::is_directory(script))
+				if (!script.ends_with(".lua"))
 				{
-					load_script(script + "/__init__.lua");
+					continue;
 				}
+
+				load_script(script);
 			}
 		}
 
-		void lua_init_stub(void* a1)
+		void tpp_game_core_init_stub()
 		{
-			if (var_lua_logging->current.get_int() >= 1)
-			{
-				console::info("[lua]: initializing\n");
-			}
-
-			lua_init_hook.invoke<void>(a1);
+			tpp_game_core_init_hook.invoke<void>();
 			load_scripts("tpp-mod/scripts");
 
 			if (game::environment::is_tpp())
@@ -451,6 +464,279 @@ namespace scripting
 				script_set_command(state, params.get(1), params.get(2));
 			}
 		}
+
+		utils::hook::detour lua_func_register_functions_hook;
+
+		int l_execute_command(game::lua::lua_State* state)
+		{
+			const auto str = game::lua::lua_tolstring(state, -1, nullptr);
+			if (str == nullptr)
+			{
+				return 0;
+			}
+			
+			command::execute(str);
+			return 0;
+		}
+
+		int l_set_var_from_string(game::lua::lua_State* state)
+		{
+			const auto name = game::lua::lua_tolstring(state, 1, nullptr);
+			const auto value = game::lua::lua_tolstring(state, 2, nullptr);
+			if (name == nullptr || value == nullptr)
+			{
+				return 0;
+			}
+
+			vars::set_var_from_string(name, value);
+			return 0;
+		}
+
+		int l_set_var_string(game::lua::lua_State* state)
+		{
+			const auto name = game::lua::lua_tolstring(state, 1, nullptr);
+			const auto value = game::lua::lua_tolstring(state, 2, nullptr);
+			if (name == nullptr || value == nullptr)
+			{
+				return 0;
+			}
+
+			const auto var = vars::find(name);
+			if (var == nullptr)
+			{
+				return 0;
+			}
+
+			vars::set_var(var, value, vars::var_source_external);
+			return 0;
+		}
+
+		int l_set_var_int(game::lua::lua_State* state)
+		{
+			if (game::lua::lua_type(state, 2) != LUA_TNUMBER)
+			{
+				return 0;
+			}
+
+			const auto name = game::lua::lua_tolstring(state, 1, nullptr);
+			const auto value = game::lua::lua_tointeger(state, 2);
+			if (name == nullptr)
+			{
+				return 0;
+			}
+
+			const auto var = vars::find(name);
+			if (var == nullptr)
+			{
+				return 0;
+			}
+
+			vars::set_var(var, value, vars::var_source_external);
+			return 0;
+		}
+
+		int l_set_var_float(game::lua::lua_State* state)
+		{
+			if (game::lua::lua_type(state, 2) != LUA_TNUMBER)
+			{
+				return 0;
+			}
+
+			const auto name = game::lua::lua_tolstring(state, 1, nullptr);
+			const auto value = game::lua::lua_tonumber(state, 2);
+			if (name == nullptr)
+			{
+				return 0;
+			}
+
+			const auto var = vars::find(name);
+			if (var == nullptr)
+			{
+				return 0;
+			}
+
+			vars::set_var(var, static_cast<float>(value), vars::var_source_external);
+			return 0;
+		}
+
+		int l_set_var_bool(game::lua::lua_State* state)
+		{
+			if (game::lua::lua_type(state, 2) != LUA_TBOOLEAN)
+			{
+				return 0;
+			}
+
+			const auto name = game::lua::lua_tolstring(state, 1, nullptr);
+			const auto value = game::lua::lua_toboolean(state, 2);
+			if (name == nullptr)
+			{
+				return 0;
+			}
+
+			const auto var = vars::find(name);
+			if (var == nullptr)
+			{
+				return 0;
+			}
+
+			vars::set_var(var, value, vars::var_source_external);
+			return 0;
+		}
+
+		int l_get_var_string(game::lua::lua_State* state)
+		{
+			const auto name = game::lua::lua_tolstring(state, 1, nullptr);
+			if (name == nullptr)
+			{
+				return 0;
+			}
+
+			const auto var = vars::find(name);
+			if (var == nullptr)
+			{
+				return 0;
+			}
+
+			if (var->type != vars::var_type_string)
+			{
+				game::lua::lua_pushstring(state, "");
+				return 1;
+			}
+
+			const auto& value = var->current.get_string();
+			game::lua::lua_pushstring(state, value.data());
+			return 1;
+		}
+
+		int l_get_var_int(game::lua::lua_State* state)
+		{
+			const auto name = game::lua::lua_tolstring(state, 1, nullptr);
+			if (name == nullptr)
+			{
+				return 0;
+			}
+
+			const auto var = vars::find(name);
+			if (var == nullptr)
+			{
+				return 0;
+			}
+
+			switch (var->type)
+			{
+			case vars::var_type_boolean:
+				game::lua::lua_pushinteger(state, var->current.enabled());
+				return 1;
+			case vars::var_type_integer:
+				game::lua::lua_pushinteger(state, var->current.get_int());
+				return 1;
+			case vars::var_type_float:
+				game::lua::lua_pushinteger(state, static_cast<int>(var->current.get_float()));
+				return 1;
+			default:
+				game::lua::lua_pushinteger(state, 0);
+				return 1;
+			}
+		}
+
+		int l_get_var_float(game::lua::lua_State* state)
+		{
+			const auto name = game::lua::lua_tolstring(state, 1, nullptr);
+			if (name == nullptr)
+			{
+				return 0;
+			}
+
+			const auto var = vars::find(name);
+			if (var == nullptr)
+			{
+				return 0;
+			}
+
+			switch (var->type)
+			{
+			case vars::var_type_integer:
+				game::lua::lua_pushnumber(state, static_cast<double>(var->current.get_int()));
+				return 1;
+			case vars::var_type_float:
+				game::lua::lua_pushnumber(state, static_cast<double>(var->current.get_float()));
+				return 1;
+			default:
+				game::lua::lua_pushnumber(state, 0.0);
+				return 1;
+			}
+		}
+
+		int l_get_var_bool(game::lua::lua_State* state)
+		{
+			const auto name = game::lua::lua_tolstring(state, 1, nullptr);
+			if (name == nullptr)
+			{
+				return 0;
+			}
+
+			const auto var = vars::find(name);
+			if (var == nullptr)
+			{
+				return 0;
+			}
+
+			switch (var->type)
+			{
+			case vars::var_type_boolean:
+				game::lua::lua_pushboolean(state, var->current.enabled());
+				return 1;
+			case vars::var_type_integer:
+				game::lua::lua_pushboolean(state, var->current.get_int() != 0);
+				return 1;
+			default:
+				game::lua::lua_pushnumber(state, 0.0);
+				return 1;
+			}
+		}
+
+		int l_print(game::lua::lua_State* state)
+		{
+			std::string buffer;
+
+			const auto argc = game::lua::lua_gettop(state);
+			for (auto i = 0; i < argc; i++)
+			{
+				const auto value = lua_value(state, i + 1);
+				buffer.append(value.to_string());
+
+				if (i < argc - 1)
+				{
+					buffer.append("\t");
+				}
+			}
+
+			console::info("[TppMod.Print] %s\n", buffer.data());
+			return 0;
+		}
+
+		void lua_func_register_functions_stub()
+		{
+			lua_func_register_functions_hook.invoke<void>();
+
+			const auto lock = acquire_lock();
+			const auto bind = game::luaext::lua_bind_start(lock->get_lua_state(), "TppMod", 0, 0, 1);
+			if (bind)
+			{
+				game::luaext::lua_bind_closure(bind, "ExecuteCommand", l_execute_command, 1, 0, 0);
+				game::luaext::lua_bind_closure(bind, "SetVarFromString", l_set_var_from_string, 1, 0, 0);
+				game::luaext::lua_bind_closure(bind, "SetVarString", l_set_var_string, 1, 0, 0);
+				game::luaext::lua_bind_closure(bind, "SetVarInt", l_set_var_int, 1, 0, 0);
+				game::luaext::lua_bind_closure(bind, "SetVarFloat", l_set_var_float, 1, 0, 0);
+				game::luaext::lua_bind_closure(bind, "SetVarBool", l_set_var_bool, 1, 0, 0);
+				game::luaext::lua_bind_closure(bind, "GetVarString", l_get_var_string, 1, 0, 0);
+				game::luaext::lua_bind_closure(bind, "GetVarInt", l_get_var_int, 1, 0, 0);
+				game::luaext::lua_bind_closure(bind, "GetVarFloat", l_get_var_float, 1, 0, 0);
+				game::luaext::lua_bind_closure(bind, "GetVarBool", l_get_var_bool, 1, 0, 0);
+				game::luaext::lua_bind_closure(bind, "Print", l_print, 1, 0, 0);
+				game::luaext::lua_bind_end(bind, 0, 0, 0);
+			}
+		}
 	}
 
 	std::unique_ptr<lua_lock> acquire_lock()
@@ -467,6 +753,8 @@ namespace scripting
 		{
 			return {};
 		}
+
+		lua_scoped_global_policy policy{lock->get_lua_state(), 0};
 
 		loading_custom_script = true;
 		const auto _0 = gsl::finally([&]
@@ -503,8 +791,10 @@ namespace scripting
 			utils::hook::inject(SELECT_VALUE(0x14017A39D, 0x14017CDCD, 0x0, 0x0) + 3, lua_print<console::con_type_warning>);
 			utils::hook::inject(SELECT_VALUE(0x14017A3C0, 0x14017CDF0, 0x0, 0x0) + 3, lua_print<console::con_type_error>);
 
-			lua_init_hook.create(SELECT_VALUE(0x140084E70, 0x140086310, 0x0, 0x0), lua_init_stub);
+			tpp_game_core_init_hook.create(SELECT_VALUE(0x140991BF0, 0x140701050, 0x0, 0x0), tpp_game_core_init_stub);
 			lual_load_buffer_hook.create(game::lua::luaL_loadbuffer, lual_load_buffer_stub);
+
+			lua_func_register_functions_hook.create(SELECT_VALUE(0x14017A0A0, 0x14017CAD0, 0x0, 0x0), lua_func_register_functions_stub);
 
 			command::add("script_var", [](const command::params& params)
 			{

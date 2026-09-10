@@ -47,7 +47,7 @@ namespace patches
 				return std::atoi(worker_count.data());
 			}
 
-			return var_worker_count->latched.get_int();
+			return var_worker_count->current.get_int();
 		}
 
 		unsigned int get_processor_count_stub()
@@ -125,7 +125,7 @@ namespace patches
 
 		float scale_ramble_speed(float speed)
 		{
-			if (var_unlock_fps->latched.enabled() && var_player_ramble_speed_patch->current.enabled())
+			if (var_unlock_fps->current.enabled() && var_player_ramble_speed_patch->current.enabled())
 			{
 				constexpr auto frame_time_60fps = 1000.0 / (60.0 * 1000.0);
 				const auto time_system = game::fox::GetTimeSystem();
@@ -143,11 +143,6 @@ namespace patches
 		{
 			const auto value = get_ramble_speed_hook.invoke<float>(a1);
 			return scale_ramble_speed(value);
-		}
-
-		int strncpy_s_stub(char* dst, size_t size, char* src, size_t max_count)
-		{
-			return strncpy_s(dst, size, src, _TRUNCATE);
 		}
 
 		utils::hook::detour get_persona_name_hook;
@@ -398,6 +393,11 @@ namespace patches
 			utils::hook::jump(SELECT_VALUE(0x1412BD4D0, 0x141222B70, 0x0, 0x0), utils::hook::assemble(tps_camera_update_parameter_stub), true);
 			utils::hook::jump(SELECT_VALUE(0x1412A06C4, 0x141214854, 0x0, 0x0), utils::hook::assemble(subjective_camera_update_parameter_stub), true);
 		}
+
+		char steam_user_logged_on_stub()
+		{
+			return 1;
+		}
 	}
 
 	class component final : public component_interface
@@ -482,9 +482,6 @@ namespace patches
 
 				get_ramble_speed_hook.create(SELECT_VALUE_LANG(0x140AFD550, 0x0), get_ramble_speed_stub);
 
-				utils::hook::nop(SELECT_VALUE_LANG(0x1405597A1, 0x144B8861D), 6);
-				utils::hook::call(SELECT_VALUE_LANG(0x1405597A1, 0x144B8861D), strncpy_s_stub);
-
 				// Limit GetFriendCount to 50 to prevent crash when opening
 				// FOB friend/follow lists with many Steam friends
 				scheduler::once(limit_friend_count, scheduler::main);
@@ -496,7 +493,7 @@ namespace patches
 			// disable _purecall error
 			utils::hook::set<std::uint8_t>(SELECT_VALUE(0x141A05976, 0x1414617EA, 0x0, 0x0), 0xC3);
 
-			if (var_unlock_fps->latched.enabled() || game::environment::is_dedi())
+			if (var_unlock_fps->current.enabled() || game::environment::is_dedi())
 			{
 				unlock_fps();
 			}
@@ -504,8 +501,15 @@ namespace patches
 			patch_sensitivity();
 			patch_fov();
 		}
+
+		void game_initialized()
+		{
+			const auto steam_user = (*game::SteamUser)();
+
+			// this shouldnt be checked according to steam docs
+			utils::hook::set(&steam_user->__vftable->LoggedOn, steam_user_logged_on_stub);
+		}
 	};
 }
 
 REGISTER_COMPONENT(patches::component)
-

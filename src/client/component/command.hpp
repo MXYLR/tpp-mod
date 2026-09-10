@@ -11,6 +11,7 @@ namespace command
 		std::string operator[](const size_t index) const;
 
 		int get_int(const size_t index) const;
+		float get_float(const size_t index) const;
 		std::uint64_t get_uint64(const size_t index) const;
 
 		size_t size() const;
@@ -39,10 +40,11 @@ namespace command
 		const std::string& description = "", const std::string& usage = "");
 	void add(const std::string& name, const callback_narg& cb,
 		const std::string& description = "", const std::string& usage = "");
+	void remove(const std::string& name);
 
 	std::optional<std::string> find_command_name(const std::string& input);
 
-	std::vector<std::string> tokenize_string(const std::string& str);
+	std::vector<std::string> tokenize_string(const std::string& str, const std::size_t begin = 0ull, const std::size_t end = std::string::npos);
 
 	std::unordered_map<std::string, command_info>& get_commands();
 	std::unordered_map<std::string, std::string>& get_aliases();

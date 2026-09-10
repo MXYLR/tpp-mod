@@ -9,6 +9,7 @@
 #include "vars.hpp"
 #include "filesystem.hpp"
 #include "binds.hpp"
+#include "scripting.hpp"
 
 #include <utils/io.hpp>
 #include <utils/string.hpp>
@@ -49,21 +50,26 @@ namespace command
 
 			std::vector<const char*> cmds;
 
+			auto was_space = true;
 			while (*command_line)
 			{
 				if (*command_line == '"')
 				{
 					inq = !inq;
 				}
-				// look for a + separating character
-				// if commandLine came from a file, we might have real line seperators
-				if ((*command_line == '+' && !inq) || *command_line == '\n' || *command_line == '\r')
+
+				if ((*command_line == '+' || *command_line == '-') && !inq && was_space)
 				{
 					const auto cmd = command_line + 1;
-					cmds.emplace_back(cmd);
+					if (*command_line == '+')
+					{
+						cmds.emplace_back(cmd);
+					}
+
 					*command_line = '\0';
 				}
 
+				was_space = *command_line == ' ';
 				command_line++;
 			}
 
@@ -167,12 +173,42 @@ namespace command
 			return cmds;
 		}
 
+		bool get_next_command(const std::string& cmd, const std::size_t begin, std::size_t& end)
+		{
+			auto is_in_quotes = false;
+
+			end = begin;
+			for (end = begin; end < cmd.size(); end++)
+			{
+				if (cmd[end] == '"')
+				{
+					is_in_quotes = !is_in_quotes;
+				}
+
+				if (!is_in_quotes && cmd[end] == ';')
+				{
+					return true;
+				}
+			}
+
+			return end != begin;
+		}
+
 		void execute_commands(const std::string& line)
 		{
-			const auto cmds = split_commands(line);
-			for (auto i = 0; i < cmds.size(); i++)
+			std::size_t begin{};
+			std::size_t end{};
+			auto start1 = std::chrono::high_resolution_clock::now();
+			while (get_next_command(line, begin, end))
 			{
-				const auto args = tokenize_string(cmds[i]);
+				const auto args = tokenize_string(line, begin, end);
+				begin = end + 1;
+
+				if (args.empty())
+				{
+					continue;
+				}
+
 				if (args[0] == "wait")
 				{
 					auto wait_time = 0;
@@ -181,17 +217,7 @@ namespace command
 						wait_time = std::atoi(args[1].data());
 					}
 
-					std::string next_commands;
-					for (auto o = i + 1; o < cmds.size(); o++)
-					{
-						next_commands.append(cmds[o]);
-
-						if (o < cmds.size() - 1)
-						{
-							next_commands.append(";");
-						}
-					}
-
+					auto next_commands = line.substr(begin);
 					queue_command(next_commands, wait_time);
 					return;
 				}
@@ -204,50 +230,67 @@ namespace command
 
 		void exec_file(const std::string& data)
 		{
+			std::string cmd_buffer;
+
 			auto is_in_comment = false;
-			const auto lines = utils::string::split_lines(data);
+			auto is_in_quotes = false;
+			auto skip_line = false;
 
-			for (const auto& line : lines)
+			for (auto i = 0ull; i < data.size(); i++)
 			{
-				std::string cmd_buffer;
-
-				auto is_in_quotes = false;
-
-				for (auto i = 0ull; i < line.size(); i++)
+				if (data[i] == '\n' || data[i] == '\r')
 				{
-					const auto cur = line[i];
-					const auto prev = i > 0 ? line[i - 1] : 0;
-					const auto next = i < line.size() - 1 ? line[i + 1] : 0;
+					if (!cmd_buffer.empty())
+					{
+						execute(cmd_buffer, true);
+					}
 
-					if (!is_in_quotes && !is_in_comment && cur == '/' && next == '*')
-					{
-						is_in_comment = true;
-						i++;
-					}
-					else if (is_in_comment && cur == '*' && next == '/')
-					{
-						is_in_comment = false;
-						i++;
-					}
-					else if (!is_in_quotes && !is_in_comment && cur == '/' && next == '/')
-					{
-						break;
-					}
-					else if (!is_in_comment && cur == '"' && prev != '\\')
-					{
-						is_in_quotes = !is_in_quotes;
-						cmd_buffer += cur;
-					}
-					else if (!is_in_comment)
-					{
-						cmd_buffer += cur;
-					}
+					cmd_buffer.clear();
+					is_in_quotes = false;
+					is_in_comment = false;
+					skip_line = false;
+					continue;
 				}
 
-				if (!cmd_buffer.empty())
+				if (skip_line)
 				{
-					execute(cmd_buffer, true);
+					continue;
 				}
+
+				const auto cur = data[i];
+				const auto prev = i > 0 ? data[i - 1] : 0;
+				const auto next = i < data.size() - 1 ? data[i + 1] : 0;
+
+				if (!is_in_quotes && !is_in_comment && cur == '/' && next == '*')
+				{
+					is_in_comment = true;
+					i++;
+				}
+				else if (is_in_comment && cur == '*' && next == '/')
+				{
+					is_in_comment = false;
+					i++;
+				}
+				else if (!is_in_quotes && !is_in_comment && cur == '/' && next == '/')
+				{
+					skip_line = true;
+					continue;
+				}
+				else if (!is_in_comment && cur == '"' && prev != '\\')
+				{
+					is_in_quotes = !is_in_quotes;
+					cmd_buffer += cur;
+				}
+				else if (!is_in_comment)
+				{
+					cmd_buffer += cur;
+				}
+			}
+
+			if (!cmd_buffer.empty())
+			{
+				execute(cmd_buffer, true);
+				cmd_buffer.clear();
 			}
 		}
 
@@ -288,6 +331,16 @@ namespace command
 		}
 
 		return std::atoi(this->tokens_[index].data());
+	}
+
+	float params::get_float(const size_t index) const
+	{
+		if (this->tokens_.size() <= index)
+		{
+			return 0;
+		}
+
+		return static_cast<float>(std::atof(this->tokens_[index].data()));
 	}
 
 	std::uint64_t params::get_uint64(const size_t index) const
@@ -370,12 +423,12 @@ namespace command
 	void add(const std::string& name, const callback& cb,
 		const std::string& description, const std::string& usage)
 	{
-		console::info("Registering console command \"%s\"\n", name.data());
+		console::debug("Registering console command \"%s\"\n", name.data());
 		command_info info{};
 		info.handler = cb;
 		info.description = description;
 		info.usage = usage;
-		commands.insert(std::make_pair(name, std::move(info)));
+		commands.insert(std::make_pair(name, info));
 	}
 
 	void add(const std::string& name, const callback_narg& cb,
@@ -387,6 +440,11 @@ namespace command
 		}, description, usage);
 	}
 
+	void remove(const std::string& name)
+	{
+		commands.erase(name);
+	}
+
 	std::optional<std::string> find_command_name(const std::string& input)
 	{
 		if (input.size() < 2)
@@ -396,7 +454,7 @@ namespace command
 
 		const auto lower = utils::string::to_lower(input);
 
-		for (const auto& [name, info] : commands)
+		for (const auto& [name, command] : commands)
 		{
 			if (name.starts_with(lower))
 			{
@@ -407,11 +465,11 @@ namespace command
 		return {};
 	}
 
-	std::vector<std::string> tokenize_string(const std::string& str)
+	std::vector<std::string> tokenize_string(const std::string& str, const std::size_t begin, const std::size_t end)
 	{
 		std::vector<std::string> res;
-
 		std::string current_token;
+
 		auto is_in_quotes = false;
 		auto is_in_word = false;
 
@@ -433,7 +491,10 @@ namespace command
 			}
 		};
 
-		for (auto i = 0; i < str.size(); i++)
+		const auto end_cap = std::min(str.size(), end);
+
+		auto was_space = false;
+		for (auto i = begin; i < end_cap; i++)
 		{
 			const auto c = str[i];
 			const auto prev = i > 0 ? str[i - 1] : 0;
@@ -445,10 +506,11 @@ namespace command
 					add_token(true);
 				}
 
+				was_space = false;
 				is_in_quotes = !is_in_quotes;
 				continue;
 			}
-			else if (c == ' ')
+			else if (c == ' ' || c == '\t')
 			{
 				if (is_in_quotes)
 				{
@@ -456,6 +518,12 @@ namespace command
 				}
 				else
 				{
+					if (was_space)
+					{
+						continue;
+					}
+
+					was_space = true;
 					is_in_word = false;
 					add_token();
 					continue;
@@ -468,6 +536,7 @@ namespace command
 					is_in_word = true;
 				}
 
+				was_space = false;
 				current_token.push_back(c);
 			}
 		}
@@ -520,7 +589,7 @@ namespace command
 					const auto name = params.get(1);
 					const auto cmd = params.get(2);
 					aliases[name] = cmd;
-					binds::write_binds();
+					vars::write_config();
 				}
 			});
 		}
@@ -631,6 +700,20 @@ namespace command
 				{
 					utils::nt::start_process("mgsvtpp.exe");
 					utils::nt::terminate();
+				});
+			}
+
+			if (game::environment::is_mgo())
+			{
+				command::add("editavatar", []()
+				{
+					const auto script_vars = game::fox::GetQuarkSystemTable()->applicationSystem->mgo.scriptVars;
+					if (script_vars->mgo.rulesetId != 4)
+					{
+						return;
+					}
+
+					scripting::script_exec("if (svars.seq_sequence == 3) then svars.seq_sequence = 4 end");
 				});
 			}
 		}

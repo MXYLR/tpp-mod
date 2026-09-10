@@ -3,7 +3,7 @@
 
 #include "game/game.hpp"
 
-#include "custom_server.hpp"
+#include "backend_server.hpp"
 #include "vars.hpp"
 #include "console.hpp"
 #include "command.hpp"
@@ -414,7 +414,7 @@ namespace server_logging
 		std::string get_dump_path(const std::string cmd_name, const bool request)
 		{
 			static const auto game_name = SELECT_VALUE_NOLANG("tpp", "mgo");
-			static const auto folder = custom_server::is_using_custom_server() ? "server_dump/custom" : "server_dump/konami";
+			static const auto folder = backend_server::is_using_custom_server() ? "server_dump/custom" : "server_dump/konami";
 
 			const auto request_folder = request ? "requests" : "responses";
 			const auto name = utils::string::va("tpp-mod/%s/%s/%s/%s/%lli.json", folder, game_name, request_folder,

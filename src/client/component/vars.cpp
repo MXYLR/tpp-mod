@@ -81,6 +81,12 @@ namespace vars
 		return std::get<std::string>(this->value_);
 	}
 
+	const char* var_value::get_c_string() const
+	{
+		const auto& str = std::get<std::string>(this->value_);
+		return str.data();
+	}
+
 	vec2_t var_value::get_vec2() const
 	{
 		return std::get<vec2_t>(this->value_);
@@ -185,7 +191,7 @@ namespace vars
 		switch (type)
 		{
 		case var_type_boolean:
-			return var_value(std::atoi(string_value.data()) == 1);
+			return var_value(std::atoi(string_value.data()) != 0);
 		case var_type_integer:
 			return var_value(std::atoi(string_value.data()));
 		case var_type_float:
@@ -341,41 +347,6 @@ namespace vars
 		}
 	}
 
-	void write_config()
-	{
-		if (game::environment::is_dedi())
-		{
-			return;
-		}
-
-		std::string buffer;
-
-		const auto path = get_config_file_path();
-
-		for (const auto& var : get_var_list())
-		{
-			if ((var->flags & var_flag_saved) == 0)
-			{
-				continue;
-			}
-
-			const auto value = var->current.to_string();
-			buffer.append(utils::string::va("set %s \"%s\"\r\n", var->name.data(), value.data()));
-		}
-
-		for (auto& cb : write_callbacks)
-		{
-			cb(buffer);
-		}
-
-		utils::io::write_file(path, buffer, false);
-	}
-
-	void add_config_write_callback(const std::function<void(std::string&)>& cb)
-	{
-		write_callbacks.emplace_back(cb);
-	}
-
 	bool cheats_enabled()
 	{
 		return true;
@@ -392,7 +363,7 @@ namespace vars
 			return;
 		}
 
-		if ((var->flags & var_flag_readonly) != 0 && set_source != var_source_internal)
+		if ((var->flags & var_flag_readonly) != 0 && set_source != var_source_internal && post_initialization)
 		{
 			console::error("\"%s\" is read only", var->name.data());
 			return;
@@ -408,11 +379,12 @@ namespace vars
 			return;
 		}
 
-		var->current = value;
 		if ((var->flags & var_flag_latched) == 0 || set_source == var_source_internal || !post_initialization)
 		{
-			var->latched = value;
+			var->current = value;
 		}
+
+		var->latched = value;
 
 		if (set_source != var_source_internal)
 		{
@@ -423,7 +395,7 @@ namespace vars
 			}
 		}
 
-		if ((var->flags & var_flag_saved) != 0 && set_source != var_source_internal)
+		if ((var->flags & var_flag_saved) != 0 && set_source != var_source_internal && post_initialization)
 		{
 			write_config();
 		}
@@ -525,7 +497,6 @@ namespace vars
 
 		return "";
 	}
-
 
 	var_ptr register_var(
 		const std::string& name, const var_type_t& type, const var_value& value, const var_limits_t limits, const std::uint32_t flags, const std::string& description)
@@ -706,8 +677,17 @@ namespace vars
 			const auto latched_str = var->latched.to_string();
 			const auto reset_str = var->reset.to_string();
 
-			console::info("\"%s\" is: \"%s\" latched: \"%s\" default: \"%s\" type: \"%s\" flags: %i\n",
-				var->name.data(), current_str.data(), latched_str.data(), reset_str.data(), var->current.type_name(), var->flags);
+			if (var->latched != var->current)
+			{
+				console::info("\"%s\" is: \"%s\" latched: \"%s\" default: \"%s\" type: \"%s\" flags: %i\n",
+					var->name.data(), current_str.data(), latched_str.data(), reset_str.data(), var->current.type_name(), var->flags);
+			}
+			else
+			{
+				console::info("\"%s\" is: \"%s\" default: \"%s\" type: \"%s\" flags: %i\n",
+					var->name.data(), current_str.data(), reset_str.data(), var->current.type_name(), var->flags);
+			}
+
 			console::info("%s\n", var->description.data());
 			console::info("   %s\n", get_var_domain(var));
 			return true;
@@ -741,6 +721,53 @@ namespace vars
 
 			set_var(var, parsed_value.value(), var_source_external);
 		}
+	}
+
+	void write_config()
+	{
+		if (game::environment::is_dedi())
+		{
+			return;
+		}
+
+		std::string buffer;
+
+		const auto path = get_config_file_path();
+		const auto& var_list = get_var_list();
+		const auto& aliases = command::get_aliases();
+
+		for (const auto& var : var_list)
+		{
+			if ((var->flags & var_flag_saved) == 0)
+			{
+				continue;
+			}
+
+			const auto value = var->latched.to_string();
+			buffer.append(utils::string::va("set %s \"%s\"\r\n", var->name.data(), value.data()));
+		}
+
+		for (const auto& alias : aliases)
+		{
+			buffer.append(utils::string::va("alias \"%s\" \"%s\"\r\n", alias.first.data(), alias.second.data()));
+		}
+
+		for (auto& cb : write_callbacks)
+		{
+			cb(buffer);
+		}
+
+		utils::io::write_file(path, buffer, false);
+	}
+
+	void add_config_write_callback(const std::function<void(std::string&)>& cb)
+	{
+		write_callbacks.emplace_back(cb);
+	}
+
+	bool is_post_initialization()
+	{
+		return post_initialization;
 	}
 
 	class component final : public component_interface

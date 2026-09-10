@@ -6,7 +6,7 @@
 #include "scheduler.hpp"
 #include "console.hpp"
 #include "vars.hpp"
-#include "custom_server.hpp"
+#include "backend_server.hpp"
 
 #include <utils/string.hpp>
 #include <utils/hook.hpp>
@@ -17,7 +17,7 @@
 #include <utils/compression.hpp>
 #include <utils/properties.hpp>
 
-namespace custom_server
+namespace backend_server
 {
 	namespace
 	{
@@ -56,7 +56,7 @@ namespace custom_server
 			return url_hash;
 		}
 
-		std::string get_legacy_custom_server_data_folder()
+		std::string get_legacy_data_folder()
 		{
 			const auto url_hash = get_url_hash();
 			const auto folder = std::format("tpp-mod\\steam_storage\\server-{}", url_hash);
@@ -78,7 +78,7 @@ namespace custom_server
 			return std::format("{}\\userdata\\{}", appdata.generic_string(), steam_id);
 		}
 
-		std::string get_custom_server_data_folder()
+		std::string get_data_folder()
 		{
 			const auto url_hash = get_url_hash();
 			return std::format("{}\\steam_storage\\server-{}", get_base_path(), url_hash);
@@ -92,8 +92,8 @@ namespace custom_server
 
 		void migrate_from_legacy_folder()
 		{
-			const auto legacy_folder = get_legacy_custom_server_data_folder();
-			const auto new_folder = get_custom_server_data_folder();
+			const auto legacy_folder = get_legacy_data_folder();
+			const auto new_folder = get_data_folder();
 			if (utils::io::directory_exists(legacy_folder) && !utils::io::directory_exists(new_folder))
 			{
 				utils::io::create_directory(new_folder);
@@ -109,9 +109,9 @@ namespace custom_server
 			}
 		}
 
-		std::string get_custom_server_data_file_path(const std::string& file_name)
+		std::string get_data_file_path(const std::string& file_name)
 		{
-			const auto folder = get_custom_server_data_folder();
+			const auto folder = get_data_folder();
 			return std::format("{}\\{}", folder, file_name);
 		}
 
@@ -126,7 +126,7 @@ namespace custom_server
 				return inst->vftbl->file_read(inst, name, buffer, size);
 			}
 
-			const auto path = get_custom_server_data_file_path(name);
+			const auto path = get_data_file_path(name);
 
 			std::string data;
 			if (utils::io::read_file(path, &data) && data.size() <= buffer_size)
@@ -145,19 +145,15 @@ namespace custom_server
 			a.mov(rcx, rsi);
 			a.mov(qword_ptr(rsp, 0x50), rdi);
 
-			a.mov(rax, rsp);
-
 			a.push(rax);
 			a.pushad64();
-			a.push(rax);
 			a.call_aligned(steam_storage_read_file_stub_internal);
-			a.pop(rax);
 			a.mov(qword_ptr(rsp, 0x80), rax);
 			a.popad64();
 			a.pop(rax);
 
 			a.test(eax, eax);
-			a.jmp(SELECT_VALUE_LANG(0x14016FC38, 0x14357A208));
+			a.jmp(SELECT_VALUE_LANG(0x14016FC38, 0x0));
 		}
 
 		void* file_read_stub(void* data, const char* file_name, size_t* result_file_size, void* buffer, 
@@ -176,29 +172,13 @@ namespace custom_server
 				return file_write_hook.invoke<int>(inst, name, buffer, size);
 			}
 
-			const auto path = get_custom_server_data_file_path(name);
+			const auto path = get_data_file_path(name);
 			if (utils::io::write_file(path, std::string{buffer, buffer + size}))
 			{
 				return 0;
 			}
 
 			return 7;
-		}
-
-		std::string get_command_line_args()
-		{
-			int num_args{};
-			const auto argv = CommandLineToArgvW(GetCommandLineW(), &num_args);
-
-			std::string buffer;
-			for (auto i = 0; i < num_args; i++)
-			{
-				buffer.append(utils::string::convert(argv[i]));
-				buffer.append(" ");
-			}
-
-			LocalFree(argv);
-			return buffer;
 		}
 
 		HANDLE create_file_stub(LPCWSTR file_name, DWORD desired_access, DWORD share_mode, 
@@ -217,7 +197,7 @@ namespace custom_server
 
 				console::info("[LocalStorage] Create file \"%s\"\n", base_name.data());
 
-				const auto path = get_custom_server_data_file_path(base_name);
+				const auto path = get_data_file_path(base_name);
 				return utils::string::convert(path);
 			};
 
@@ -295,7 +275,7 @@ namespace custom_server
 		{
 			migrate_from_legacy_folder();
 
-			const auto folder = get_custom_server_data_folder();
+			const auto folder = get_data_folder();
 			utils::io::write_file(std::format("{}\\server_url.txt", folder), custom_url);
 
 			const auto steam_user = (*game::SteamUser)();
@@ -486,6 +466,110 @@ namespace custom_server
 			message["data"] = nlohmann::json::parse(message_data);
 			return {message};
 		}
+
+		utils::hook::detour http_codec_begin_encode_hook;
+		utils::hook::detour http_codec_end_decode_hook;
+
+		vars::var_ptr var_server_logging;
+		vars::var_ptr var_net_server_heartbeat;
+
+		std::string get_dump_path(const std::string cmd_name, const bool request)
+		{
+			static const auto game_name = SELECT_VALUE_NOLANG("tpp", "mgo");
+			static const auto folder = backend_server::is_using_custom_server() ? "server_dump/custom" : "server_dump/konami";
+
+			const auto request_folder = request ? "requests" : "responses";
+			const auto name = utils::string::va("tpp-mod/%s/%s/%s/%s/%lli.json", folder, game_name, request_folder,
+				cmd_name.data(), GetTickCount64());
+
+			return name;
+		}
+
+		std::string get_fox_buffer(game::fox::Buffer* buffer)
+		{
+			const auto buf = game::fox::Buffer_::GetBuffer(buffer);
+			const auto buf_size = game::fox::Buffer_::GetSize(buffer);
+			const auto data = std::string{buf, buf + buf_size};
+			return data;
+		}
+
+		void* http_codec_end_decode_stub(void* this_, void* ctx, game::fox::Buffer* buffer)
+		{
+			const auto res = http_codec_end_decode_hook.invoke<void*>(this_, ctx, buffer);
+
+			if (var_server_logging->current.enabled())
+			{
+				const auto data = get_fox_buffer(buffer);
+				const auto json = nlohmann::json::parse(data);
+				const auto cmd = json["msgid"].get<std::string>();
+
+				console::info("[net] received response for command \"%s\"", cmd.data());
+
+				const auto path = get_dump_path(cmd, false);
+				utils::io::write_file(path, json.dump(4));
+			}
+
+			return res;
+		}
+
+		void* http_codec_begin_encode_stub(void* this_, void* ctx, game::fox::Buffer* buffer, void* session_key)
+		{
+			if (var_server_logging->current.enabled())
+			{
+				const auto data = get_fox_buffer(buffer);
+				const auto json = nlohmann::json::parse(data);
+				const auto cmd = json["msgid"].get<std::string>();
+
+				console::info("[net] sending request for command \"%s\"", cmd.data());
+
+				const auto path = get_dump_path(cmd, true);
+				utils::io::write_file(path, json.dump(4));
+			}
+
+			return http_codec_begin_encode_hook.invoke<void*>(this_, ctx, buffer, session_key);
+		}
+
+		float get_heartbeat_time()
+		{
+			return static_cast<float>(var_net_server_heartbeat->current.get_int());
+		}
+
+		void session_daemon_update_stub(utils::hook::assembler& a)
+		{
+			a.pushad64();
+			a.call_aligned(get_heartbeat_time);
+			a.popad64();
+
+			a.xor_(esi, esi);
+			a.comiss(xmm6, xmm0);
+			a.jmp(SELECT_VALUE(0x1407DFC0E, 0x14057D3CE, 0x0, 0x0));
+		}
+
+		void net_daemon_set_heartbeat(void* this_, int value)
+		{
+			vars::set_var(var_net_server_heartbeat, value, vars::var_source_internal);
+			console::info("[net] set heartbeat: %i\n", value);
+			utils::hook::invoke<void>(SELECT_VALUE(0x1407DE720, 0x14057BEA0, 0x0, 0x0), this_, value);
+		}
+
+		game::tpp::net::SessionControl* net_update_session_failure_stub(void* a1, game::fox::StringId error)
+		{
+			const auto session_control = game::tpp::net::ServerManager_::GetSessionControl(*game::tpp::net::ServerManager_::s_instance);
+			if (++session_control->errorCount < 3)
+			{
+				session_control->state = 3;
+				session_control->error.id = 0xB8A0BF169F98;
+			}
+			else
+			{
+				session_control->state = 4;
+				session_control->error = error;
+			}
+
+			console::error("[net] session update failure 0x%llX (count: %i)\n", error.id, session_control->errorCount);
+
+			return session_control;
+		}
 	}
 
 	bool is_using_custom_server()
@@ -545,14 +629,25 @@ namespace custom_server
 		{
 			var_custom_server = vars::register_string("net_custom_server", "", vars::var_flag_saved | vars::var_flag_latched, "custom server url (empty = disabled)");
 			var_net_proxy_url = vars::register_string("net_proxy_url", "", vars::var_flag_saved, "proxy url for backend server (example: http://1.2.3.4:1234 empty = disabled)");
+		
+			var_server_logging = vars::register_bool("net_server_logging", false, vars::var_flag_saved, "enable server logging");
+			var_net_server_heartbeat = vars::register_int("net_server_heartbeat", 0, 0, 10000, 0, "backend server heartbeat interval");
 		}
 
 		void start() override
 		{
 			apply_custom_server();
 			patch_win_http();
+
+			http_codec_begin_encode_hook.create(SELECT_VALUE(0x141CE2DC0, 0x140C41750, 0x0, 0x0), http_codec_begin_encode_stub);
+			http_codec_end_decode_hook.create(SELECT_VALUE(0x141CE35E0, 0x140C41F70, 0x0, 0x0), http_codec_end_decode_stub);
+
+			utils::hook::far_jump<BASE_ADDRESS>(SELECT_VALUE(0x1407DFC08, 0x14057D3C8, 0x0, 0x0), utils::hook::assemble(session_daemon_update_stub));
+			utils::hook::call(SELECT_VALUE(0x1407D2736, 0x140572156, 0x0, 0x0), net_daemon_set_heartbeat);
+
+			utils::hook::jump(SELECT_VALUE(0x140806B60, 0x14059A9A0, 0x0, 0x0), net_update_session_failure_stub);
 		}
 	};
 }
 
-REGISTER_COMPONENT(custom_server::component)
+REGISTER_COMPONENT(backend_server::component)

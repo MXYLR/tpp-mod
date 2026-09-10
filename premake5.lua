@@ -242,6 +242,10 @@ workspace "tpp-mod"
 	warnings "Extra"
 	characterset "ASCII"
 
+	-- C4819: non-ASCII characters in comments of vendored headers (nlohmann/json)
+	-- trip this warning on non-UTF8 locales (e.g. cp936), and Release treats warnings as errors
+	buildoptions {"/wd4819"}
+
 	if _OPTIONS["dev-build"] then
 		defines {"DEV_BUILD"}
 	end

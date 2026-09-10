@@ -729,24 +729,24 @@ namespace fobs
 			std::memset(fob_target->playerInfos, 0, sizeof(game::tpp::mbm::PlayerBasicInfo) * fob_target->maxPlayers);
 
 			const auto _0 = gsl::finally([&]
-		{
-			add_custom_targets(list->type.data->buffer, fob_target);
-		});
-
-		const auto cache_players = gsl::finally([&]
-		{
-			for (auto i = 0; i < fob_target->maxPlayers; i++)
 			{
-				const auto& player_info = fob_target->playerInfos[i];
-				if (player_info.owner_account.id == 0)
-				{
-					break;
-				}
-				fob_target::cache_player_info(player_info);
-			}
-		});
+				add_custom_targets(list->type.data->buffer, fob_target);
+			});
 
-		if (list->type.data->buffer != "CHALLENGE"s)
+			const auto cache_players = gsl::finally([&]
+			{
+				for (auto i = 0; i < fob_target->maxPlayers; i++)
+				{
+					const auto& player_info = fob_target->playerInfos[i];
+					if (player_info.owner_account.id == 0)
+					{
+						break;
+					}
+					fob_target::cache_player_info(player_info);
+				}
+			});
+
+			if (list->type.data->buffer != "CHALLENGE"s)
 			{
 				fob_target_receive_enemy_basic_info_hook.invoke<void>(fob_target, list);
 				return;
@@ -964,4 +964,3 @@ namespace fobs
 }
 
 REGISTER_COMPONENT(fobs::component)
-

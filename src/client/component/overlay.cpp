@@ -4,7 +4,7 @@
 
 #include "game/game.hpp"
 
-#include "renderer.hpp"
+#include "renderer/draw.hpp"
 #include "scheduler.hpp"
 #include "session.hpp"
 #include "vars.hpp"
@@ -105,8 +105,9 @@ namespace overlay
 			return nullptr;
 		}
 
-		void generate_ping_text(ping_text_cont_t& ping_text_cont_)
+		void generate_ping_text(ping_text_cont_t& text)
 		{
+			static const auto steam_friends = (*game::SteamFriends)();
 			const auto main_session = *game::s_pSession;
 			if (main_session == nullptr)
 			{
@@ -118,7 +119,7 @@ namespace overlay
 
 			const auto calc_color = [&](const int rtt)
 			{
-				ping_text_cont_.color = rtt < 100 ? color_good : (rtt < 200 ? color_ok : color_bad);
+				text.color = rtt < 100 ? color_good : (rtt < 200 ? color_ok : color_bad);
 			};
 
 			switch (session_state)
@@ -126,35 +127,35 @@ namespace overlay
 			case 2:
 			case 3:
 			{
-				ping_text_cont_.color = color_good;
+				text.color = color_good;
 				const auto peer = get_peer_member(main_session);
-				if (game::environment::is_tpp() && peer != nullptr && peer->sppSocket != nullptr && peer->sppSocket->tpp.rtt_time != -1)
+				if (game::environment::is_tpp() && peer != nullptr && peer->sppSocket != nullptr && 
+					peer->sppSocket->tpp.rtt_time != -1 && peer->sessionUserId->userId != 0)
 				{
 					game::steam_id user_id{};
 					user_id.bits = peer->sessionUserId->userId;
-					const auto steam_friends = (*game::SteamFriends)();
-					const auto name = steam_friends->__vftable->GetFriendPersonaName(steam_friends, user_id);
 					calc_color(peer->sppSocket->tpp.rtt_time);
-					snprintf(ping_text_cont_.buffer, sizeof(ping_text_cont_.buffer), "%s - %ims", name, peer->sppSocket->tpp.rtt_time);
+					const auto name = steam_friends->__vftable->GetFriendPersonaName(steam_friends, user_id);
+					snprintf(text.buffer, sizeof(text.buffer), "%s - %ims", name, peer->sppSocket->tpp.rtt_time);
 				}
 				else
 				{
-					strcpy_s(ping_text_cont_.buffer, sizeof(ping_text_cont_.buffer), "HOST");
+					strcpy_s(text.buffer, sizeof(text.buffer), "HOST");
 				}
 				break;
 			}
 			case 4:
 			case 5:
 			{
-				ping_text_cont_.color = color_ok;
-				strcpy_s(ping_text_cont_.buffer, sizeof(ping_text_cont_.buffer), "CONNECTING");
+				text.color = color_ok;
+				strcpy_s(text.buffer, sizeof(text.buffer), "CONNECTING");
 				break;
 			}
 			case 6:
 			case 7:
 			{
 				calc_color(rtt);
-				snprintf(ping_text_cont_.buffer, sizeof(ping_text_cont_.buffer), "%ims", rtt);
+				snprintf(text.buffer, sizeof(text.buffer), "%ims", rtt);
 				break;
 			}
 			}
@@ -270,7 +271,7 @@ namespace overlay
 
 		void draw_mod_name(game::fox::gr::dg::plugins::Draw2DRenderer* instance)
 		{
-			const auto& mod = mods::var_fs_mod_path->latched.get_string();
+			const auto& mod = mods::var_fs_mod_path->current.get_string();
 			if (mod.empty())
 			{
 				return;
@@ -315,8 +316,6 @@ namespace overlay
 			var_ui_draw_fps = vars::register_bool("ui_draw_fps", 0, vars::var_flag_saved, "draw fps counter");
 			var_ui_draw_ping = vars::register_bool("ui_draw_ping", 0, vars::var_flag_saved, "draw ping counter");
 			var_ui_draw_mod = vars::register_bool("ui_draw_mod", 1, vars::var_flag_saved, "draw mod name");
-
-			renderer::on_frame(draw_overlay);
 		}
 
 		void start() override
@@ -327,8 +326,22 @@ namespace overlay
 			}
 
 			scheduler::loop(perf_update, scheduler::main);
-			scheduler::loop(update_ping_text, scheduler::session);
+			scheduler::loop(update_ping_text, scheduler::session, 500ms);
 		}
+
+		void game_initialized() override
+		{
+			if (game::environment::is_dedi())
+			{
+				return;
+			}
+
+			component::draw_instance = renderer::register_draw(draw_overlay, renderer::priority_topmost + 1);
+		}
+
+	private:
+		std::unique_ptr<renderer::draw2d_t> draw_instance;
+
 	};
 }
 

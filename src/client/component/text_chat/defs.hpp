@@ -28,13 +28,26 @@ namespace text_chat
 	constexpr auto chat_message_fade_time = 1000;
 	constexpr auto chat_scroll_sound_id = 152;
 	constexpr auto chat_key_default = 'Y';
-	constexpr auto chat_message_max_len = 200;
+	constexpr auto chat_message_max_len = 128ull;
+	constexpr auto chat_message_buffer_len = 255ull;
 
-	using message_buffer_t = char[256];
+	using message_buffer_t = wchar_t[chat_message_buffer_len + 1];
+
+	enum chat_input_mode_t
+	{
+		mode_none = 0,
+		mode_chat = 1,
+		mode_chat_team = 2,
+		mode_count = 3,
+	};
+
+	extern const wchar_t* chat_prefixes[mode_count];
 
 	struct chat_message_t
 	{
 		message_buffer_t buffer;
+		float width;
+		int lines;
 		std::chrono::high_resolution_clock::time_point time;
 	};
 
@@ -44,13 +57,6 @@ namespace text_chat
 		bool started;
 		std::chrono::high_resolution_clock::time_point start;
 		std::chrono::milliseconds duration;
-	};
-
-	enum chat_input_mode_t
-	{
-		mode_none = 0,
-		mode_chat = 1,
-		mode_chat_team = 2,
 	};
 
 	struct chat_state_t
@@ -64,7 +70,7 @@ namespace text_chat
 		message_buffer_t input;
 		int cursor;
 		std::vector<sound_play_t> sounds;
-		std::deque<std::string> history;
+		std::deque<std::wstring> history;
 		std::int32_t history_index = -1;
 	};
 
@@ -73,7 +79,7 @@ namespace text_chat
 	bool is_chat_enabled();
 	bool can_use_chat();
 
-	std::string clean_message(const std::string& msg);
+	std::size_t clean_message(const std::wstring& msg, wchar_t* out, const std::size_t max_len);
 
 	void clear();
 

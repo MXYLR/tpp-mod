@@ -1,5 +1,6 @@
 #pragma once
 #include <d3d11.h>
+#include <d3d11_1.h>
 
 namespace game
 {
@@ -110,6 +111,71 @@ namespace game
 		int permissions;
 		bool locked;
 		int chatroom;
+	};
+
+	struct P2PSessionRequest_t
+	{
+		steam_id remote;
+	};
+
+	struct ISteamClient;
+	struct ISteamUser;
+	struct ISteamGameServer;
+	struct ISteamFriends;
+	struct ISteamUtils;
+	struct ISteamMatchmaking;
+	struct ISteamMatchmakingServers;
+	struct ISteamUserStats;
+	struct ISteamGameServerStats;
+	struct ISteamApps;
+	struct ISteamNetworking;
+	struct ISteamRemoteStorage;
+	struct ISteamScreenshots;
+	struct ISteamHTTP;
+	struct ISteamUnifiedMessages;
+	struct ISteamController;
+	struct ISteamUGC;
+	struct ISteamAppList;
+	struct ISteamMusic;
+	struct ISteamMusicRemote;
+
+	struct ISteamClient_vtbl
+	{
+		int(__fastcall* CreateSteamPipe)(ISteamClient*);
+		bool(__fastcall* BReleaseSteamPipe)(ISteamClient*, int hSteamPipe);
+		int(__fastcall* ConnectToGlobalUser)(ISteamClient*, int hSteamPipe);
+		int(__fastcall* CreateLocalUser)(ISteamClient*, int* phSteamPipe, int eAccountType);
+		void(__fastcall* ReleaseUser)(ISteamClient*, int hSteamPipe, int hUser);
+		ISteamUser* (__fastcall* GetISteamUser)(ISteamClient*, int hSteamUser, int hSteamPipe, const char* pchVersion);
+		ISteamGameServer* (__fastcall* GetISteamGameServer)(ISteamClient*, int hSteamUser, int hSteamPipe, const char* pchVersion);
+		void(__fastcall* SetLocalIPBinding)(ISteamClient*, unsigned int unIP, unsigned short usPort);
+		ISteamFriends* (__fastcall* GetISteamFriends)(ISteamClient*, int hSteamUser, int hSteamPipe, const char* pchVersion);
+		ISteamUtils* (__fastcall* GetISteamUtils)(ISteamClient*, int hSteamPipe, const char* pchVersion);
+		ISteamMatchmaking* (__fastcall* GetISteamMatchmaking)(ISteamClient*, int hSteamUser, int hSteamPipe, const char* pchVersion);
+		ISteamMatchmakingServers* (__fastcall* GetISteamMatchmakingServers)(ISteamClient*, int hSteamUser, int hSteamPipe, const char* pchVersion);
+		void* (__fastcall* GetISteamGenericInterface)(ISteamClient*, int hSteamUser, int hSteamPipe, const char* pchVersion);
+		ISteamUserStats* (__fastcall* GetISteamUserStats)(ISteamClient*, int hSteamUser, int hSteamPipe, const char* pchVersion);
+		ISteamGameServerStats* (__fastcall* GetISteamGameServerStats)(ISteamClient*, int hSteamuser, int hSteamPipe, const char* pchVersion);
+		ISteamApps* (__fastcall* GetISteamApps)(ISteamClient*, int hSteamUser, int hSteamPipe, const char* pchVersion);
+		ISteamNetworking* (__fastcall* GetISteamNetworking)(ISteamClient*, int hSteamUser, int hSteamPipe, const char* pchVersion);
+		ISteamRemoteStorage* (__fastcall* GetISteamRemoteStorage)(ISteamClient*, int hSteamuser, int hSteamPipe, const char* pchVersion);
+		ISteamScreenshots* (__fastcall* GetISteamScreenshots)(ISteamClient*, int hSteamuser, int hSteamPipe, const char* pchVersion);
+		void(__fastcall* RunFrame)(ISteamClient*);
+		unsigned int(__fastcall* GetIPCCallCount)(ISteamClient*);
+		void(__fastcall* SetWarningMessageHook)(ISteamClient*, void* pFunction);
+		bool(__fastcall* BShutdownIfAllPipesClosed)(ISteamClient*);
+		ISteamHTTP* (__fastcall* GetISteamHTTP)(ISteamClient*, int hSteamuser, int hSteamPipe, const char* pchVersion);
+		ISteamUnifiedMessages* (__fastcall* GetISteamUnifiedMessages)(ISteamClient*, int hSteamuser, int hSteamPipe, const char* pchVersion);
+		ISteamController* (__fastcall* GetISteamController)(ISteamClient*, int hSteamUser, int hSteamPipe, const char* pchVersion);
+		ISteamUGC* (__fastcall* GetISteamUGC)(ISteamClient*, int hSteamUser, int hSteamPipe, const char* pchVersion);
+		ISteamAppList* (__fastcall* GetISteamAppList)(ISteamClient*, int hSteamUser, int hSteamPipe, const char* pchVersion);
+		ISteamMusic* (__fastcall* GetISteamMusic)(ISteamClient*, int hSteamuser, int hSteamPipe, const char* pchVersion);
+		ISteamMusicRemote* (__fastcall* GetISteamMusicRemote)(ISteamClient*, int hSteamuser, int hSteamPipe, const char* pchVersion);
+	};
+
+	struct ISteamClient
+	{
+		ISteamClient_vtbl* __vftable;
 	};
 
 	struct /*VFT*/ ISteamUser_vtbl
@@ -259,6 +325,39 @@ namespace game
 		ISteamFriends_vtbl* __vftable /*VFT*/;
 	};
 
+	struct ISteamApps;
+
+	struct ISteamApps_vtbl
+	{
+		bool(__fastcall* BIsSubscribed)(ISteamApps*);
+		bool(__fastcall* BIsLowViolence)(ISteamApps*);
+		bool(__fastcall* BIsCybercafe)(ISteamApps*);
+		bool(__fastcall* BIsVACBanned)(ISteamApps*);
+		const char* (__fastcall* GetCurrentGameLanguage)(ISteamApps*);
+		const char* (__fastcall* GetAvailableGameLanguages)(ISteamApps*);
+		bool(__fastcall* BIsSubscribedApp)(ISteamApps*, unsigned int appID);
+		bool(__fastcall* BIsDlcInstalled)(ISteamApps*, unsigned int appID);
+		unsigned int(__fastcall* GetEarliestPurchaseUnixTime)(ISteamApps*, unsigned int nAppID);
+		bool(__fastcall* BIsSubscribedFromFreeWeekend)(ISteamApps*);
+		int(__fastcall* GetDLCCount)(ISteamApps*);
+		bool(__fastcall* BGetDLCDataByIndex)(ISteamApps*, int iDLC, unsigned int* pAppID, bool* pbAvailable, char* pchName, int cchNameBufferSize);
+		void(__fastcall* InstallDLC)(ISteamApps*, unsigned int nAppID);
+		void(__fastcall* UninstallDLC)(ISteamApps*, unsigned int nAppID);
+		void(__fastcall* RequestAppProofOfPurchaseKey)(ISteamApps*, unsigned int nAppID);
+		bool(__fastcall* GetCurrentBetaName)(ISteamApps*, char* pchName, int cchNameBufferSize);
+		bool(__fastcall* MarkContentCorrupt)(ISteamApps*, bool bMissingFilesOnly);
+		unsigned int(__fastcall* GetInstalledDepots)(ISteamApps*, unsigned int appID, unsigned int* pvecDepots, unsigned int cMaxDepots);
+		unsigned int(__fastcall* GetAppInstallDir)(ISteamApps*, unsigned int appID, char* pchFolder, unsigned int cchFolderBufferSize);
+		bool(__fastcall* BIsAppInstalled)(ISteamApps*, unsigned int appID);
+		steam_id(__fastcall* GetAppOwner)(ISteamApps*);
+		const char* (__fastcall* GetLaunchQueryParam)(ISteamApps*, const char* pchKey);
+	};
+
+	struct ISteamApps
+	{
+		ISteamApps_vtbl* __vftable;
+	};
+
 	struct LobbyCreated_t
 	{
 		enum { k_iCallback = k_iSteamMatchmakingCallbacks + 13 };
@@ -329,7 +428,17 @@ namespace game
 	{
 		struct Value
 		{
-			char __pad0[24];
+			union u_t
+			{
+				int integer;
+				double value;
+				char byte;
+				void* ptr;
+			};
+
+			u_t u;
+			char type;
+			char __pad0[8];
 		};
 	}
 
@@ -341,14 +450,68 @@ namespace game
 		};
 	}
 
-	namespace tpp::ui::menu
-	{
-		struct UiCommonDataManager;
-	}
-
 	namespace gn
 	{
-		struct Buffer
+		struct swapchain
+		{
+			char __pad0[24];
+			IDXGISwapChain* swapChain;
+		};
+
+		struct CommandList
+		{
+			char __pad0[4];
+			unsigned int resourceId;
+			void* unk;
+			volatile __int32 lock;
+		};
+
+		namespace internal
+		{
+			namespace dx11
+			{
+				struct DeviceContext
+				{
+					char __pad0[4];
+					unsigned int resourceId;
+					ID3D11DeviceContext* deviceContext;
+					ID3DUserDefinedAnnotation* annotation;
+					gn::CommandList* commandList;
+				};
+
+				struct resource
+				{
+					volatile __int32 refCount;
+					unsigned int resourceId;
+					unsigned int a2;
+					ID3D11Resource* resource;
+				};
+			}
+		}
+
+		namespace dx11
+		{
+			struct buffer
+			{
+				char __pad0[4];
+				unsigned int resourceId;
+				unsigned int byteWidth;
+				unsigned int bindFlags;
+				ID3D11Buffer* buffer;
+			};
+		}
+
+		struct DeviceContext : gn::internal::dx11::DeviceContext
+		{
+
+		};
+
+		struct Resource : gn::internal::dx11::resource
+		{
+
+		};
+
+		struct Buffer : gn::dx11::buffer
 		{
 			char* data;
 			unsigned int size;
@@ -426,6 +589,11 @@ namespace game
 			pfimpl pf;
 		};
 
+		struct Mutex
+		{
+			char __pad0[16];
+		};
+
 		struct Quark
 		{
 			struct vtable
@@ -465,6 +633,65 @@ namespace game
 		static_assert(offsetof(Buffer, capacity) == 32);
 		static_assert(offsetof(Buffer, flags) == 40);
 		static_assert(sizeof(Buffer) == 0x30);
+
+		struct StringId_fields
+		{
+			std::uint32_t l;
+			std::uint32_t h;
+		};
+
+		struct StringId
+		{
+			union
+			{
+				StringId_fields f;
+				std::uint64_t id;
+			};
+		};
+
+		struct Path
+		{
+			__int64 id;
+		};
+
+		struct KernelString
+		{
+			const char* buffer;
+			__int64 unk1;
+			__int64 unk2;
+			__int64 unk3;
+		};
+
+		struct PathId
+		{
+			std::uint64_t id;
+		};
+
+		typedef std::uint32_t KeyCode;
+
+		template <typename T>
+		struct EntityPtrBase
+		{
+			T* ptr;
+		};
+
+		struct EntityHandle
+		{
+			void* a1;
+		};
+
+		template <typename T>
+		struct Array
+		{
+			std::uint32_t size;
+			std::uint32_t capacity;
+			T** array;
+		};
+
+		struct Entity
+		{
+
+		};
 
 		struct RawKeyboardData
 		{
@@ -514,6 +741,7 @@ namespace game
 
 			void* a2;
 			void* queue;
+			char __pad0[56];
 		};
 
 		struct LuaAutoPtr
@@ -528,9 +756,36 @@ namespace game
 			char __pad0[16];
 		};
 
+		struct Script
+		{
+
+		};
+
+		struct HashMapBase_unk1
+		{
+			void** ptr_array1;
+			void* ptr1;
+		};
+
 		struct HashMapBase
 		{
-			char __pad0[48];
+			struct vtable
+			{
+
+			};
+			vtable* __vftable;
+			HashMapBase_unk1* unk1;
+			HashMapBase_unk1* unk2;
+			int a1;
+			short a2_1;
+			short a2_2;
+			void* end;
+			void* ptr6;
+			void* unk3;
+			void* unk4;
+			int unk5_1;
+			int unk5_2;
+			void* unk6;
 		};
 
 		namespace fs
@@ -591,12 +846,109 @@ namespace game
 				char __pad1[16];
 				SharedString id;
 				char __pad2[8];
-				fox::gr::SceneObjectList** objectList1;
-				fox::gr::SceneObjectList* objectList2;
+				SceneObjectList** objectList1;
+				SceneObjectList* objectList2;
 				char __pad3[16];
 				void* lock;
 			};
 
+			struct TonemapDesc
+			{
+				float minExposure;
+				float maxExposure;
+				float exposureCompensation;
+				float bloomSize;
+				float bloomBrightnessExtraction;
+				float bloomWeight;
+			};
+
+			struct Camera
+			{
+				struct AdaptiveAddExpCompParameter
+				{
+					float param1;
+					float param2;
+					float param3;
+					float param4;
+					float param5;
+					float param6;
+					float param7;
+					float param8;
+					float param9;
+					float param10;
+				};
+
+				struct vtable
+				{
+
+				};
+
+				vtable* __vftable;
+				float f38;
+				float f39;
+				float f40;
+				float f41;
+				float f42;
+				float f43;
+				float f44;
+				float f45;
+				TonemapDesc tonemapDesc;
+				float m2[4];
+				float m3[4];
+				int view[4];
+				float m5[4];
+				float m6[4];
+				float m7[4];
+				float m8[4];
+				float m9[4];
+				float m10[4];
+				float m11[4];
+				float m12[4];
+				float m13[4];
+				unsigned int flags;
+				float f29;
+				float f30;
+				float f31;
+				float viewAngleFactor;
+				float viewAngle;
+				__int64 unk3;
+				float f32;
+				float f33;
+				float f34;
+				float f35;
+				double d1;
+				double d2;
+				float f36;
+				float f37;
+				float fArr1[2];
+				float fArr2[2];
+				unsigned a1;
+				unsigned a2;
+				__int64 unk2;
+				float f1;
+				float f2;
+				float f3;
+				float f4;
+				float f5;
+				float f6;
+				float f7;
+				float f8;
+				float f9;
+				float f10;
+				float f11;
+				float f12;
+				float f13;
+				float f14;
+				float f15;
+				float f16;
+				float f17;
+				float f18;
+				float f19;
+				float f20;
+				AdaptiveAddExpCompParameter adaptiveAddExpCompParameter;
+			};
+
+			struct Packet2DBuffer;
 			struct Draw2D
 			{
 				struct vtable
@@ -609,10 +961,56 @@ namespace game
 				Draw2D* next;
 				char __pad1[8];
 				int priority;
-				char __pad2[36];
+				char __pad2[20];
+				Packet2DBuffer* packetBuffer;
+				Camera* camera;
 				int flags;
 				char __pad3[8];
 			};
+
+			struct Viewport;
+			struct Viewport
+			{
+				struct vtable
+				{
+
+				};
+
+				vtable* __vftable;
+				char __pad0[40];
+				Viewport* next;
+				char __pad1[1336];
+				Camera camera;
+			};
+
+			struct Render;
+			struct Render
+			{
+				struct vtable
+				{
+
+				};
+				vtable* __vftable;
+				Render* next;
+				char __pad1[4];
+				unsigned int flags;
+				char __pad0[40];
+				Mutex mutex;
+				char __pad4[64];
+				SharedString name;
+				char __pad2[8];
+				Viewport* viewportList;
+				char __pad3[56];
+			};
+
+			struct RenderWork
+			{
+				char __pad0[32];
+				Render* renderList;
+				Render* defaultRender;
+				char __pad1[32];
+			};
+
 
 			struct ResourceId
 			{
@@ -634,6 +1032,33 @@ namespace game
 				ResourceId id;
 			};
 
+			struct RenderParameter
+			{
+				void* unk1;
+				void* unk2;
+				void* unk3;
+				void* unk4;
+				void* unk5;
+				unsigned int a1;
+				unsigned int a2;
+				unsigned int a3;
+				unsigned int a4;
+				unsigned int a5;
+				unsigned int a6;
+				unsigned int a7;
+				unsigned int a8;
+				void* unk6;
+				void* unk7;
+				void* unk8;
+				unsigned int a9;
+				char a10;
+				char a11;
+				char a12;
+				char a13;
+				char a14;
+				char a15;
+			};
+
 			namespace dg
 			{
 				struct StringFontMetricsCache
@@ -647,34 +1072,87 @@ namespace game
 
 				struct _TextureGlyphData
 				{
-					float a1;
-					float a2;
-					char a3_1;
-					char a3_2;
-					char a3_3;
-					char a3_4;
-					char a4_1;
-					char a4_2;
-					char a4_3;
-					char a4_4;
+					unsigned short character;
+					unsigned short a1_2;
+					unsigned short a2_1;
+					unsigned short a2_2;
+					unsigned char a3_1;
+					unsigned char a3_2;
+					unsigned char a3_3;
+					unsigned char horizontalSpace;
+					unsigned char width;
+					unsigned char height;
+					char horizontalShift;
+					char verticalShift;
 					float a5;
 					float a6;
 					float a7;
 					float a8;
 				};
 
+				struct _TextureAreaInfo
+				{
+					int a1;
+					short width;
+					short height;
+					short a3_1;
+					short a3_2;
+					short a4_1;
+					short a4_2;
+				};
+
 				struct ImageGlyphManager
 				{
-					char __pad0[8];
+					struct vtable
+					{
+						void(__fastcall* __destructor)(ImageGlyphManager*, char);
+					};
+
+					vtable* __vftable;
 					_TextureGlyphData* imageGlyphs;
-					fox::HashMapBase hashMap;
-					char __pad1[24];
+					HashMapBase hashMap;
 					int numGlyphs;
 					int numUnk;
 					char __pad2[256];
 				};
 
-				struct FontSystem_unk1
+				struct ImageAreaManager
+				{
+					struct vtable
+					{
+						void(__fastcall* __destructor)(ImageAreaManager*, char);
+					};
+
+					vtable* __vftable;
+					_TextureAreaInfo areas[2048];
+					char states[2048];
+					int count;
+					int a2;
+					HashMapBase hashMap;
+				};
+
+				struct FontTextureRender
+				{
+					struct vtable
+					{
+						void(__fastcall* __destructor)(FontTextureRender*);
+					};
+
+					vtable* __vftable;
+					unsigned int pixel_width;
+					unsigned int pixel_height;
+					unsigned int fontTextureHandle;
+					char __pad1[4];
+					void* unk1;
+					char __pad2[16];
+					void* unk2;
+					char __pad3[16];
+					ImageGlyphManager* imageGlyphManager;
+					ImageAreaManager* imageAreaManager;
+					char __pad4[1072];
+				};
+
+				struct FontSystem_unk2
 				{
 					char __pad0[10];
 					char c1;
@@ -683,36 +1161,121 @@ namespace game
 					char c2;
 				};
 
-				struct FontSystem_unk2
+				struct MemoryManager_unk1
 				{
-					char __pad0[72];
-					ImageGlyphManager* imageGlyphManager;
+					size_t unk1;
+					void* unk2;
+					size_t unk3;
+					size_t unk4;
+				};
+
+				struct MemoryManager
+				{
+					MemoryManager_unk1* unk1;
+					size_t size;
+				};
+
+				struct FontData_Glyph
+				{
+					unsigned int character;
+					unsigned short xOffset;
+					unsigned short yOffset;
+					unsigned char width;
+					unsigned char height;
+					unsigned char layer;
+					unsigned char horizontalSpace;
+					unsigned char horizontalShift;
+					char verticalShift;
+					unsigned short unk1;
+					unsigned int unk2;
+				};
+
+				struct FontData
+				{
+					struct vtable
+					{
+
+					};
+
+					vtable* __vftable;
+					unsigned char unk1_1;
+					unsigned char unk1_2;
+					unsigned char unk1_3;
+					unsigned char unk1_4;
+					short unk2;
+					short glyphCount;
+					int glyphDataSize;
+					unsigned char spacing;
+					unsigned char unk3_2;
+					unsigned char unk3_3;
+					unsigned char unk3_4;
+					FontData_Glyph* glyphs;
+					char unk4;
+					char widthExp;
+					char heightExp;
+					char unk5;
+					int fontDataSize;
+					void* fontDataBuffer;
+					MemoryManager* memoryManager;
+					float width;
+					float height;
+					short defaultCharacter;
+					unsigned char fontIndex;
+					unsigned char unk7;
 				};
 
 				struct FontSystem
 				{
+					/*
+					0: default
+					1: FontSystem_LatinFont
+					2: FontSystem_KanjiFont
+					3: FontSystem_Slot3
+					4: FontSystem_Slot4
+					5: FontSystem_Slot5
+					6: FontSystem_Slot6
+					7: FontSystem_Slot7
+					8: 
+					*/
+
 					char __pad0[8];
-					void* ptr_array1[9];
-					fox::gr::dg::FontSystem_unk1* unk1;
-					fox::gr::dg::FontSystem_unk2* unk2;
+					FontData* fonts[8];
+					MemoryManager* memoryManager;
+					FontTextureRender* fontTextureRender;
+					FontSystem_unk2* unk2;
 				};
 
 				struct DynamicVertexBuffer_unk1
 				{
-					char __pad0[20];
-					int count;
+					Array<gn::Buffer> bufferArray;
+					unsigned int a2;
+					unsigned int count;
 				};
 
 				struct DynamicVertexBuffer
 				{
-					char __pad0[64];
+					struct Cluster
+					{
+						unsigned int count;
+						gn::Resource** resources;
+						char __pad0[8];
+					};
+
+					char __pad0[16];
+					Cluster clusters[2];
 					DynamicVertexBuffer_unk1* unk1;
-					char __pad1[8];
+					unsigned int count;
+					unsigned int a4;
 					gn::Buffer* buffer;
-					char __pad2[16];
+					Array<void*> unkArray;
 					void* ptr1;
 					unsigned int a1;
 					unsigned int a2;
+				};
+				
+				struct DynamicIndexBuffer
+				{
+					char __pad0[0x78];
 				};
 
 				struct SubCommandContext
@@ -728,13 +1291,15 @@ namespace game
 					DynamicVertexBuffer* vertexBuffer;
 					void* ptr2;
 					void* ptr3;
-					void* ptr4;
+					Camera* camera;
 					char __pad1[4];
 					float f1;
 					int viewX;
 					int viewY;
 					int viewWidth;
 					int viewHeight;
+					char __pad2[8];
+					void* ptr4;
 				};
 
 				struct FontTextureMetrics
@@ -755,18 +1320,42 @@ namespace game
 
 				};
 
+#pragma pack(push, 1)
 				struct ShadowConstantRegister
 				{
+					struct Buffer
+					{
+						struct vector
+						{
+							float vec[4];
+						};
 
+						gn::Buffer* bufferInstance;
+						vector* vectors;
+						void* unk2;
+						int count;
+						int a2;
+					};
+
+					Buffer buffers[8];
+					void* data;
+					unsigned int bufferCount;
+					unsigned int vectorCount;
+					unsigned int flags;
+					unsigned int unkCount;
+					unsigned int a1;
+					void* unk1;
+					unsigned int a2;
 				};
+#pragma pack(pop)
 
-				struct CommandBuffer
+				struct CommandListNode;
+				struct CommandListNode
 				{
-					char __pad0[40];
-					fox::gr::dg::ShadowConstantRegister* shadowConstantRegister;
-					char __pad1[16];
-					fox::gr::ResourceId material;
-					char __pad2[556];
+					fox::gr::dg::CommandListNode* node1;
+					fox::gr::dg::CommandListNode* node2;
+					gn::CommandList* commandList;
+					unsigned int flags;
 				};
 
 				struct MaterialResource_unk1
@@ -820,16 +1409,466 @@ namespace game
 					ShaderTechnique* shaderTechniques;
 				};
 
-				namespace plugins
+				struct RenderResourceContext
 				{
-					struct Draw2DRenderer_unk
+					char __pad0[0x398];
+				};
+
+				struct MacroPacketBuffer
+				{
+					char __pad0[0x80];
+				};
+
+				struct RenderStateContext
+				{
+					unsigned char flags1[8];
+					short w1;
+					short w2;
+					short w3;
+					short w4;
+					unsigned int flags4;
+					char __pad0[4];
+					void* unk1;
+					void* unk2;
+					float f1;
+					char __pad1[20];
+					float f2;
+					float f3;
+					float f4;
+					float f5;
+					unsigned int a1;
+					char __pad2[36];
+					unsigned int flags2;
+					unsigned int flags3;
+					unsigned int a5;
+				};
+
+				static_assert(offsetof(RenderStateContext, flags2) == 0x78);
+
+				struct CommandBuffer
+				{
+					char __pad0[8];
+					gn::DeviceContext* deviceContext;
+					char flags;
+					char __pad1[7];
+					fox::gr::dg::CommandListNode* commandList;
+					char __pad2[8];
+					fox::gr::dg::ShadowConstantRegister* shadowConstantRegister;
+					fox::gr::dg::RenderStateContext* renderStateContext;
+					char __pad3[8];
+					fox::gr::ResourceId material;
+					char __pad4[556];
+				};
+
+				static_assert(offsetof(CommandBuffer, shadowConstantRegister) == 40);
+				static_assert(offsetof(CommandBuffer, material) == 64);
+
+				struct DgDx11;
+				struct DgDx11
+				{
+					struct vtable
 					{
-						unsigned char flags1[8];
-						char __pad0[112];
-						unsigned int flags2;
-						unsigned int flags3;
+						void(__fastcall* meth_001)(fox::gr::dg::DgDx11*);
+						void(__fastcall* EndInstance)(fox::gr::dg::DgDx11*);
+						void(__fastcall* SetupShaderResources)(fox::gr::dg::DgDx11*);
+						void(__fastcall* meth_004)(fox::gr::dg::DgDx11*);
+						void(__fastcall* Wait)(fox::gr::dg::DgDx11*);
+						void(__fastcall* Kick)(fox::gr::dg::DgDx11*);
+						void(__fastcall* Start)(fox::gr::dg::DgDx11*);
+						void(__fastcall* End)(fox::gr::dg::DgDx11*);
+						void(__fastcall* SkipRendering)(fox::gr::dg::DgDx11*);
+						void(__fastcall* DestroyRenderInfo)(fox::gr::dg::DgDx11*);
+						void(__fastcall* meth_011)(fox::gr::dg::DgDx11*);
+						void(__fastcall* EndRender)(fox::gr::dg::DgDx11*);
+						void(__fastcall* InitViewport)(fox::gr::dg::DgDx11*);
+						void(__fastcall* EndViewport)(fox::gr::dg::DgDx11*);
+						void(__fastcall* RestoreViewport)(fox::gr::dg::DgDx11*);
+						void(__fastcall* SetViewportDirect)(fox::gr::dg::DgDx11*);
+						void(__fastcall* SetGamma)(fox::gr::dg::DgDx11*);
+						void(__fastcall* meth_018)(fox::gr::dg::DgDx11*);
+						void(__fastcall* ValidateVideoOutSettings)(fox::gr::dg::DgDx11*);
+						void(__fastcall* SetVideoOutSettings)(fox::gr::dg::DgDx11*);
+						void(__fastcall* meth_021)(fox::gr::dg::DgDx11*);
+						void(__fastcall* meth_022)(fox::gr::dg::DgDx11*);
+						void(__fastcall* CreateRenderTarget)(fox::gr::dg::DgDx11*);
+						void(__fastcall* RestoreRenderTarget)(fox::gr::dg::DgDx11*);
+						void(__fastcall* CreateRenderBuffer)(fox::gr::dg::DgDx11*);
+						void(__fastcall* SetViewportScissor)(fox::gr::dg::DgDx11*);
+						void(__fastcall* BeginRenderBuffer)(fox::gr::dg::DgDx11*);
+						void(__fastcall* EndRenderBuffer)(fox::gr::dg::DgDx11*);
+						void(__fastcall* GetCurrentRenderBuffer)(fox::gr::dg::DgDx11*);
+						void(__fastcall* ResolveRenderTexture)(fox::gr::dg::DgDx11*);
+						void(__fastcall* GetPrimaryDepthTarget)(fox::gr::dg::DgDx11*);
+						void(__fastcall* meth_032)(fox::gr::dg::DgDx11*);
+						void(__fastcall* meth_033)(fox::gr::dg::DgDx11*);
+						void(__fastcall* meth_034)(fox::gr::dg::DgDx11*);
+						void(__fastcall* SetShader)(fox::gr::dg::DgDx11*);
+						void(__fastcall* SetMatrix)(fox::gr::dg::DgDx11*);
+						void(__fastcall* SetVector)(fox::gr::dg::DgDx11*);
+						void(__fastcall* SetVectors)(fox::gr::dg::DgDx11*);
+						void(__fastcall* SetSkinningParam)(fox::gr::dg::DgDx11*);
+						void(__fastcall* CreateShaderFileResource)(fox::gr::dg::DgDx11*);
+						void(__fastcall* meth_041)(fox::gr::dg::DgDx11*);
+						void(__fastcall* SetShaderObject)(fox::gr::dg::DgDx11*);
+						void(__fastcall* CreateInputLayoutResource)(fox::gr::dg::DgDx11*);
+						void(__fastcall* SetInputLayout)(fox::gr::dg::DgDx11*);
+						void(__fastcall* meth_045)(fox::gr::dg::DgDx11*);
+						void(__fastcall* CreateRenderStateResource)(fox::gr::dg::DgDx11*);
+						void(__fastcall* meth_047)(fox::gr::dg::DgDx11*);
+						void(__fastcall* UpdateStatus)(fox::gr::dg::DgDx11*);
+						void(__fastcall* SetupRenderStateByFrame)(fox::gr::dg::DgDx11*);
+						void(__fastcall* CreateVertexBufferResource)(fox::gr::dg::DgDx11*);
+						void(__fastcall* CreateIndexBufferResource)(fox::gr::dg::DgDx11*);
+						void(__fastcall* SetVertexBuffer)(fox::gr::dg::DgDx11*);
+						void(__fastcall* SetIndexBuffer)(fox::gr::dg::DgDx11*);
+						void(__fastcall* CreateVertexStreamResource)(fox::gr::dg::DgDx11*);
+						void(__fastcall* SetVertexStream)(fox::gr::dg::DgDx11*);
+						void(__fastcall* DummyCreateTexture)(fox::gr::dg::DgDx11*);
+						void(__fastcall* CreateTexture2D)(fox::gr::dg::DgDx11*);
+						void(__fastcall* CreateTexture3D)(fox::gr::dg::DgDx11*);
+						void(__fastcall* CreateTextureCube)(fox::gr::dg::DgDx11*);
+						void(__fastcall* meth_060)(fox::gr::dg::DgDx11*);
+						void(__fastcall* meth_061)(fox::gr::dg::DgDx11*);
+						void(__fastcall* SetTexture)(fox::gr::dg::DgDx11*);
+						void(__fastcall* SetVertexTexture)(fox::gr::dg::DgDx11*);
+						void(__fastcall* meth_064)(fox::gr::dg::DgDx11*);
+						void(__fastcall* SetMaterial)(fox::gr::dg::DgDx11*);
+						void(__fastcall* meth_066)(fox::gr::dg::DgDx11*);
+						void(__fastcall* CreateModelResource)(fox::gr::dg::DgDx11*);
+						void(__fastcall* CreateCloneResource)(fox::gr::dg::DgDx11*);
+						void(__fastcall* CreateModel)(fox::gr::dg::DgDx11*);
+						void(__fastcall* DestroyModel)(fox::gr::dg::DgDx11*);
+						void(__fastcall* StartModelObject)(fox::gr::dg::DgDx11*);
+						void(__fastcall* EndModelObject)(fox::gr::dg::DgDx11*);
+						void(__fastcall* meth_073)(fox::gr::dg::DgDx11*);
+						void(__fastcall* meth_074)(fox::gr::dg::DgDx11*);
+						void(__fastcall* EndModelDebug)(fox::gr::dg::DgDx11*);
+						void(__fastcall* GetModelDebugInfo)(fox::gr::dg::DgDx11*);
+						void(__fastcall* CreateClone)(fox::gr::dg::DgDx11*);
+						void(__fastcall* DestroyClone)(fox::gr::dg::DgDx11*);
+						void(__fastcall* GetCloneMaterials)(fox::gr::dg::DgDx11*);
+						void(__fastcall* ValidateClone)(fox::gr::dg::DgDx11*);
+						void(__fastcall* GetCloneModelMaxSize)(fox::gr::dg::DgDx11*);
+						void(__fastcall* PerformanceEventBegin)(fox::gr::dg::DgDx11*);
+						void(__fastcall* meth_083)(fox::gr::dg::DgDx11*);
+						void(__fastcall* meth_084)(fox::gr::dg::DgDx11*);
+						void(__fastcall* meth_085)(fox::gr::dg::DgDx11*);
+						void(__fastcall* meth_086)(fox::gr::dg::DgDx11*);
+						void(__fastcall* meth_087)(fox::gr::dg::DgDx11*);
+						void(__fastcall* meth_088)(fox::gr::dg::DgDx11*);
+						void(__fastcall* InitShadow)(fox::gr::dg::DgDx11*);
+						void(__fastcall* QuitShadow)(fox::gr::dg::DgDx11*);
+						void(__fastcall* StartShadow)(fox::gr::dg::DgDx11*);
+						void(__fastcall* meth_092)(fox::gr::dg::DgDx11*);
+						void(__fastcall* EndShadow)(fox::gr::dg::DgDx11*);
+						void(__fastcall* InitGBuffer)(fox::gr::dg::DgDx11*);
+						void(__fastcall* QuitGBuffer)(fox::gr::dg::DgDx11*);
+						void(__fastcall* StartGeometryPass)(fox::gr::dg::DgDx11*);
+						void(__fastcall* EndGeometryPass)(fox::gr::dg::DgDx11*);
+						void(__fastcall* StartGeometryMaskPass)(fox::gr::dg::DgDx11*);
+						void(__fastcall* meth_099)(fox::gr::dg::DgDx11*);
+						void(__fastcall* StartGeometryMaskPass1)(fox::gr::dg::DgDx11*);
+						void(__fastcall* meth_101)(fox::gr::dg::DgDx11*);
+						void(__fastcall* StartGeometryDecalPass)(fox::gr::dg::DgDx11*);
+						void(__fastcall* EndGeometryDecalPass)(fox::gr::dg::DgDx11*);
+						void(__fastcall* SetupDeferredShading)(fox::gr::dg::DgDx11*);
+						void(__fastcall* SetupDeferredShadingTexture)(fox::gr::dg::DgDx11*);
+						void(__fastcall* StartDeferredShading)(fox::gr::dg::DgDx11*);
+						void(__fastcall* meth_107)(fox::gr::dg::DgDx11*);
+						void(__fastcall* DrawDeferredShading)(fox::gr::dg::DgDx11*);
+						void(__fastcall* StartDeferredRendering)(fox::gr::dg::DgDx11*);
+						void(__fastcall* meth_110)(fox::gr::dg::DgDx11*);
+						void(__fastcall* StartGeometryVelocityPass)(fox::gr::dg::DgDx11*);
+						void(__fastcall* EndGeometryVelocityPass)(fox::gr::dg::DgDx11*);
+						void(__fastcall* StartGeometryMaskedVelocityPass)(fox::gr::dg::DgDx11*);
+						void(__fastcall* meth_114)(fox::gr::dg::DgDx11*);
+						void(__fastcall* meth_115)(fox::gr::dg::DgDx11*);
+						void(__fastcall* meth_116)(fox::gr::dg::DgDx11*);
+						void(__fastcall* meth_117)(fox::gr::dg::DgDx11*);
+						void(__fastcall* StartShrinkBuffer)(fox::gr::dg::DgDx11*);
+						void(__fastcall* EndShrinkBuffer)(fox::gr::dg::DgDx11*);
+						void(__fastcall* meth_120)(fox::gr::dg::DgDx11*);
+						void(__fastcall* meth_121)(fox::gr::dg::DgDx11*);
+						void(__fastcall* meth_122)(fox::gr::dg::DgDx11*);
+						void(__fastcall* meth_123)(fox::gr::dg::DgDx11*);
+						void(__fastcall* meth_124)(fox::gr::dg::DgDx11*);
+						void(__fastcall* meth_125)(fox::gr::dg::DgDx11*);
+						void(__fastcall* meth_126)(fox::gr::dg::DgDx11*);
+						void(__fastcall* meth_127)(fox::gr::dg::DgDx11*);
+						void(__fastcall* InitLineIntegralSSAO)(fox::gr::dg::DgDx11*);
+						void(__fastcall* QuitLineIntegralSSAO)(fox::gr::dg::DgDx11*);
+						void(__fastcall* ResetLineIntegralSSAO)(fox::gr::dg::DgDx11*);
+						void(__fastcall* StartLineIntegralSSAO)(fox::gr::dg::DgDx11*);
+						void(__fastcall* meth_132)(fox::gr::dg::DgDx11*);
+						void(__fastcall* meth_133)(fox::gr::dg::DgDx11*);
+						void(__fastcall* InitPostFilter)(fox::gr::dg::DgDx11*);
+						void(__fastcall* QuitPostFilter)(fox::gr::dg::DgDx11*);
+						void(__fastcall* StartPostFilter)(fox::gr::dg::DgDx11*);
+						void(__fastcall* EndPostFilter)(fox::gr::dg::DgDx11*);
+						void(__fastcall* InitMotionBlur)(fox::gr::dg::DgDx11*);
+						void(__fastcall* QuitMotionBlur)(fox::gr::dg::DgDx11*);
+						void(__fastcall* ResetMotionBlur)(fox::gr::dg::DgDx11*);
+						void(__fastcall* StartMotionBlur)(fox::gr::dg::DgDx11*);
+						void(__fastcall* DrawMotionBlur)(fox::gr::dg::DgDx11*);
+						void(__fastcall* EndMotionBlur)(fox::gr::dg::DgDx11*);
+						void(__fastcall* InitScreenSpaceVelocity)(fox::gr::dg::DgDx11*);
+						void(__fastcall* QuitScreenSpaceVelocity)(fox::gr::dg::DgDx11*);
+						void(__fastcall* meth_146)(fox::gr::dg::DgDx11*);
+						void(__fastcall* StartScreenSpaceVelocity)(fox::gr::dg::DgDx11*);
+						void(__fastcall* DrawScreenSpaceVelocity)(fox::gr::dg::DgDx11*);
+						void(__fastcall* EndScreenSpaceVelocity)(fox::gr::dg::DgDx11*);
+						void(__fastcall* meth_150)(fox::gr::dg::DgDx11*);
+						void(__fastcall* meth_151)(fox::gr::dg::DgDx11*);
+						void(__fastcall* meth_152)(fox::gr::dg::DgDx11*);
+						void(__fastcall* meth_153)(fox::gr::dg::DgDx11*);
+						void(__fastcall* meth_154)(fox::gr::dg::DgDx11*);
+						void(__fastcall* meth_155)(fox::gr::dg::DgDx11*);
+						void(__fastcall* meth_156)(fox::gr::dg::DgDx11*);
+						void(__fastcall* meth_157)(fox::gr::dg::DgDx11*);
+						void(__fastcall* meth_158)(fox::gr::dg::DgDx11*);
+						void(__fastcall* GetBackBufferWidth)(fox::gr::dg::DgDx11*);
+						void(__fastcall* GetBackBufferHeight)(fox::gr::dg::DgDx11*);
+						void(__fastcall* DrawFullScreenTriangle)(fox::gr::dg::DgDx11*);
+						void(__fastcall* meth_162)(fox::gr::dg::DgDx11*);
+						void(__fastcall* ResolvePrimaryBufferReplica)(fox::gr::dg::DgDx11*);
+						void(__fastcall* GetPrimaryBufferReplicaAsTexture)(fox::gr::dg::DgDx11*);
+						void(__fastcall* GetPrimaryBufferAsTexture)(fox::gr::dg::DgDx11*);
+						void(__fastcall* GetMacroPacketBuffer)(fox::gr::dg::DgDx11*);
+						void(__fastcall* BuildCommandFromOverlayModelMacroPackets)(fox::gr::dg::DgDx11*);
+						void(__fastcall* GetRenderCondition)(fox::gr::dg::DgDx11*);
+						void(__fastcall* SetRenderCondition)(fox::gr::dg::DgDx11*);
+						void(__fastcall* meth_170)(fox::gr::dg::DgDx11*);
+						void(__fastcall* meth_171)(fox::gr::dg::DgDx11*);
+						void(__fastcall* CreateSubCommandContext)(fox::gr::dg::DgDx11*);
+						void(__fastcall* meth_173)(fox::gr::dg::DgDx11*);
+						void(__fastcall* meth_174)(fox::gr::dg::DgDx11*);
+						void(__fastcall* meth_175)(fox::gr::dg::DgDx11*);
+						void(__fastcall* meth_176)(fox::gr::dg::DgDx11*);
+						void(__fastcall* InitTemporaryOutput)(fox::gr::dg::DgDx11*);
+						void(__fastcall* meth_178)(fox::gr::dg::DgDx11*);
 					};
 
+					vtable* __vftable;
+					char __pad0[140];
+					TonemapDesc tonemapDesc;
+					char __pad5[52];
+					DynamicVertexBuffer* dynamicVertexBuffer;
+					DynamicIndexBuffer* dynamicIndexBuffer;
+					RenderParameter* renderParameter;
+					unsigned int a6;
+					unsigned int a7;
+					void* unk4;
+					char __pad1[32];
+					MacroPacketBuffer* macroPacketBuffer;
+					ShadowConstantRegister* shadowConstantRegister;
+					RenderStateContext* renderStateContext;
+					RenderResourceContext* renderResourceContext;
+					void* unk2;
+					gn::DeviceContext* deviceContext;
+					void* unk3;
+					void* commandListCluster;
+					char __pad3[32];
+					unsigned int a1;
+					unsigned int a2;
+					unsigned int a3;
+					unsigned int a4;
+					unsigned int a5;
+					char __pad4[116];
+				};
+
+				struct Dg;
+				struct Dg
+				{
+					struct vtable
+					{
+						void(__fastcall* meth_001)(fox::gr::dg::Dg*);
+						void(__fastcall* EndInstance)(fox::gr::dg::Dg*);
+						void(__fastcall* SetupShaderResources)(fox::gr::dg::Dg*);
+						void(__fastcall* meth_004)(fox::gr::dg::Dg*);
+						void(__fastcall* Wait)(fox::gr::dg::Dg*);
+						void(__fastcall* Kick)(fox::gr::dg::Dg*);
+						void(__fastcall* Start)(fox::gr::dg::Dg*);
+						void(__fastcall* End)(fox::gr::dg::Dg*);
+						void(__fastcall* SkipRendering)(fox::gr::dg::Dg*);
+						void(__fastcall* DestroyRenderInfo)(fox::gr::dg::Dg*);
+						void(__fastcall* meth_011)(fox::gr::dg::Dg*);
+						void(__fastcall* EndRender)(fox::gr::dg::Dg*);
+						void(__fastcall* InitViewport)(fox::gr::dg::Dg*);
+						void(__fastcall* EndViewport)(fox::gr::dg::Dg*);
+						void(__fastcall* RestoreViewport)(fox::gr::dg::Dg*);
+						void(__fastcall* SetViewportDirect)(fox::gr::dg::Dg*);
+						void(__fastcall* SetGamma)(fox::gr::dg::Dg*);
+						void(__fastcall* meth_018)(fox::gr::dg::Dg*);
+						void(__fastcall* ValidateVideoOutSettings)(fox::gr::dg::Dg*);
+						void(__fastcall* SetVideoOutSettings)(fox::gr::dg::Dg*);
+						void(__fastcall* meth_021)(fox::gr::dg::Dg*);
+						void(__fastcall* meth_022)(fox::gr::dg::Dg*);
+						void(__fastcall* CreateRenderTarget)(fox::gr::dg::Dg*);
+						void(__fastcall* RestoreRenderTarget)(fox::gr::dg::Dg*);
+						void(__fastcall* CreateRenderBuffer)(fox::gr::dg::Dg*);
+						void(__fastcall* SetViewportScissor)(fox::gr::dg::Dg*);
+						void(__fastcall* BeginRenderBuffer)(fox::gr::dg::Dg*);
+						void(__fastcall* EndRenderBuffer)(fox::gr::dg::Dg*);
+						void(__fastcall* GetCurrentRenderBuffer)(fox::gr::dg::Dg*);
+						void(__fastcall* ResolveRenderTexture)(fox::gr::dg::Dg*);
+						void(__fastcall* GetPrimaryDepthTarget)(fox::gr::dg::Dg*);
+						void(__fastcall* meth_032)(fox::gr::dg::Dg*);
+						void(__fastcall* meth_033)(fox::gr::dg::Dg*);
+						void(__fastcall* meth_034)(fox::gr::dg::Dg*);
+						void(__fastcall* SetShader)(fox::gr::dg::Dg*);
+						void(__fastcall* SetMatrix)(fox::gr::dg::Dg*);
+						void(__fastcall* SetVector)(fox::gr::dg::Dg*);
+						void(__fastcall* SetVectors)(fox::gr::dg::Dg*);
+						void(__fastcall* SetSkinningParam)(fox::gr::dg::Dg*);
+						void(__fastcall* CreateShaderFileResource)(fox::gr::dg::Dg*);
+						void(__fastcall* meth_041)(fox::gr::dg::Dg*);
+						void(__fastcall* SetShaderObject)(fox::gr::dg::Dg*);
+						void(__fastcall* CreateInputLayoutResource)(fox::gr::dg::Dg*);
+						void(__fastcall* SetInputLayout)(fox::gr::dg::Dg*);
+						void(__fastcall* meth_045)(fox::gr::dg::Dg*);
+						void(__fastcall* CreateRenderStateResource)(fox::gr::dg::Dg*);
+						void(__fastcall* meth_047)(fox::gr::dg::Dg*);
+						void(__fastcall* UpdateStatus)(fox::gr::dg::Dg*);
+						void(__fastcall* SetupRenderStateByFrame)(fox::gr::dg::Dg*);
+						void(__fastcall* CreateVertexBufferResource)(fox::gr::dg::Dg*);
+						void(__fastcall* CreateIndexBufferResource)(fox::gr::dg::Dg*);
+						void(__fastcall* SetVertexBuffer)(fox::gr::dg::Dg*);
+						void(__fastcall* SetIndexBuffer)(fox::gr::dg::Dg*);
+						void(__fastcall* CreateVertexStreamResource)(fox::gr::dg::Dg*);
+						void(__fastcall* SetVertexStream)(fox::gr::dg::Dg*);
+						void(__fastcall* DummyCreateTexture)(fox::gr::dg::Dg*);
+						void(__fastcall* CreateTexture2D)(fox::gr::dg::Dg*);
+						void(__fastcall* CreateTexture3D)(fox::gr::dg::Dg*);
+						void(__fastcall* CreateTextureCube)(fox::gr::dg::Dg*);
+						void(__fastcall* meth_060)(fox::gr::dg::Dg*);
+						void(__fastcall* meth_061)(fox::gr::dg::Dg*);
+						void(__fastcall* SetTexture)(fox::gr::dg::Dg*);
+						void(__fastcall* SetVertexTexture)(fox::gr::dg::Dg*);
+						void(__fastcall* meth_064)(fox::gr::dg::Dg*);
+						void(__fastcall* SetMaterial)(fox::gr::dg::Dg*);
+						void(__fastcall* meth_066)(fox::gr::dg::Dg*);
+						void(__fastcall* CreateModelResource)(fox::gr::dg::Dg*);
+						void(__fastcall* CreateCloneResource)(fox::gr::dg::Dg*);
+						void(__fastcall* CreateModel)(fox::gr::dg::Dg*);
+						void(__fastcall* DestroyModel)(fox::gr::dg::Dg*);
+						void(__fastcall* StartModelObject)(fox::gr::dg::Dg*);
+						void(__fastcall* EndModelObject)(fox::gr::dg::Dg*);
+						void(__fastcall* meth_073)(fox::gr::dg::Dg*);
+						void(__fastcall* meth_074)(fox::gr::dg::Dg*);
+						void(__fastcall* EndModelDebug)(fox::gr::dg::Dg*);
+						void(__fastcall* GetModelDebugInfo)(fox::gr::dg::Dg*);
+						void(__fastcall* CreateClone)(fox::gr::dg::Dg*);
+						void(__fastcall* DestroyClone)(fox::gr::dg::Dg*);
+						void(__fastcall* GetCloneMaterials)(fox::gr::dg::Dg*);
+						void(__fastcall* ValidateClone)(fox::gr::dg::Dg*);
+						void(__fastcall* GetCloneModelMaxSize)(fox::gr::dg::Dg*);
+						void(__fastcall* PerformanceEventBegin)(fox::gr::dg::Dg*);
+						void(__fastcall* meth_083)(fox::gr::dg::Dg*);
+						void(__fastcall* meth_084)(fox::gr::dg::Dg*);
+						void(__fastcall* meth_085)(fox::gr::dg::Dg*);
+						void(__fastcall* meth_086)(fox::gr::dg::Dg*);
+						void(__fastcall* meth_087)(fox::gr::dg::Dg*);
+						void(__fastcall* meth_088)(fox::gr::dg::Dg*);
+						void(__fastcall* InitShadow)(fox::gr::dg::Dg*);
+						void(__fastcall* QuitShadow)(fox::gr::dg::Dg*);
+						void(__fastcall* StartShadow)(fox::gr::dg::Dg*);
+						void(__fastcall* meth_092)(fox::gr::dg::Dg*);
+						void(__fastcall* EndShadow)(fox::gr::dg::Dg*);
+						void(__fastcall* InitGBuffer)(fox::gr::dg::Dg*);
+						void(__fastcall* QuitGBuffer)(fox::gr::dg::Dg*);
+						void(__fastcall* StartGeometryPass)(fox::gr::dg::Dg*);
+						void(__fastcall* EndGeometryPass)(fox::gr::dg::Dg*);
+						void(__fastcall* StartGeometryMaskPass)(fox::gr::dg::Dg*);
+						void(__fastcall* meth_099)(fox::gr::dg::Dg*);
+						void(__fastcall* StartGeometryMaskPass1)(fox::gr::dg::Dg*);
+						void(__fastcall* meth_101)(fox::gr::dg::Dg*);
+						void(__fastcall* StartGeometryDecalPass)(fox::gr::dg::Dg*);
+						void(__fastcall* EndGeometryDecalPass)(fox::gr::dg::Dg*);
+						void(__fastcall* SetupDeferredShading)(fox::gr::dg::Dg*);
+						void(__fastcall* SetupDeferredShadingTexture)(fox::gr::dg::Dg*);
+						void(__fastcall* StartDeferredShading)(fox::gr::dg::Dg*);
+						void(__fastcall* meth_107)(fox::gr::dg::Dg*);
+						void(__fastcall* DrawDeferredShading)(fox::gr::dg::Dg*);
+						void(__fastcall* StartDeferredRendering)(fox::gr::dg::Dg*);
+						void(__fastcall* meth_110)(fox::gr::dg::Dg*);
+						void(__fastcall* StartGeometryVelocityPass)(fox::gr::dg::Dg*);
+						void(__fastcall* EndGeometryVelocityPass)(fox::gr::dg::Dg*);
+						void(__fastcall* StartGeometryMaskedVelocityPass)(fox::gr::dg::Dg*);
+						void(__fastcall* meth_114)(fox::gr::dg::Dg*);
+						void(__fastcall* meth_115)(fox::gr::dg::Dg*);
+						void(__fastcall* meth_116)(fox::gr::dg::Dg*);
+						void(__fastcall* meth_117)(fox::gr::dg::Dg*);
+						void(__fastcall* StartShrinkBuffer)(fox::gr::dg::Dg*);
+						void(__fastcall* EndShrinkBuffer)(fox::gr::dg::Dg*);
+						void(__fastcall* meth_120)(fox::gr::dg::Dg*);
+						void(__fastcall* meth_121)(fox::gr::dg::Dg*);
+						void(__fastcall* meth_122)(fox::gr::dg::Dg*);
+						void(__fastcall* meth_123)(fox::gr::dg::Dg*);
+						void(__fastcall* meth_124)(fox::gr::dg::Dg*);
+						void(__fastcall* meth_125)(fox::gr::dg::Dg*);
+						void(__fastcall* meth_126)(fox::gr::dg::Dg*);
+						void(__fastcall* meth_127)(fox::gr::dg::Dg*);
+						void(__fastcall* InitLineIntegralSSAO)(fox::gr::dg::Dg*);
+						void(__fastcall* QuitLineIntegralSSAO)(fox::gr::dg::Dg*);
+						void(__fastcall* ResetLineIntegralSSAO)(fox::gr::dg::Dg*);
+						void(__fastcall* StartLineIntegralSSAO)(fox::gr::dg::Dg*);
+						void(__fastcall* meth_132)(fox::gr::dg::Dg*);
+						void(__fastcall* meth_133)(fox::gr::dg::Dg*);
+						void(__fastcall* InitPostFilter)(fox::gr::dg::Dg*);
+						void(__fastcall* QuitPostFilter)(fox::gr::dg::Dg*);
+						void(__fastcall* StartPostFilter)(fox::gr::dg::Dg*);
+						void(__fastcall* EndPostFilter)(fox::gr::dg::Dg*);
+						void(__fastcall* InitMotionBlur)(fox::gr::dg::Dg*);
+						void(__fastcall* QuitMotionBlur)(fox::gr::dg::Dg*);
+						void(__fastcall* ResetMotionBlur)(fox::gr::dg::Dg*);
+						void(__fastcall* StartMotionBlur)(fox::gr::dg::Dg*);
+						void(__fastcall* DrawMotionBlur)(fox::gr::dg::Dg*);
+						void(__fastcall* EndMotionBlur)(fox::gr::dg::Dg*);
+						void(__fastcall* InitScreenSpaceVelocity)(fox::gr::dg::Dg*);
+						void(__fastcall* QuitScreenSpaceVelocity)(fox::gr::dg::Dg*);
+						void(__fastcall* meth_146)(fox::gr::dg::Dg*);
+						void(__fastcall* StartScreenSpaceVelocity)(fox::gr::dg::Dg*);
+						void(__fastcall* DrawScreenSpaceVelocity)(fox::gr::dg::Dg*);
+						void(__fastcall* EndScreenSpaceVelocity)(fox::gr::dg::Dg*);
+						void(__fastcall* meth_150)(fox::gr::dg::Dg*);
+						void(__fastcall* meth_151)(fox::gr::dg::Dg*);
+						void(__fastcall* meth_152)(fox::gr::dg::Dg*);
+						void(__fastcall* meth_153)(fox::gr::dg::Dg*);
+						void(__fastcall* meth_154)(fox::gr::dg::Dg*);
+						void(__fastcall* meth_155)(fox::gr::dg::Dg*);
+						void(__fastcall* meth_156)(fox::gr::dg::Dg*);
+						void(__fastcall* meth_157)(fox::gr::dg::Dg*);
+						void(__fastcall* meth_158)(fox::gr::dg::Dg*);
+						void(__fastcall* GetBackBufferWidth)(fox::gr::dg::Dg*);
+						void(__fastcall* GetBackBufferHeight)(fox::gr::dg::Dg*);
+						void(__fastcall* DrawFullScreenTriangle)(fox::gr::dg::Dg*);
+						void(__fastcall* meth_162)(fox::gr::dg::Dg*);
+						void(__fastcall* ResolvePrimaryBufferReplica)(fox::gr::dg::Dg*);
+						void(__fastcall* GetPrimaryBufferReplicaAsTexture)(fox::gr::dg::Dg*);
+						void(__fastcall* GetPrimaryBufferAsTexture)(fox::gr::dg::Dg*);
+						void(__fastcall* GetMacroPacketBuffer)(fox::gr::dg::Dg*);
+						void(__fastcall* BuildCommandFromOverlayModelMacroPackets)(fox::gr::dg::Dg*);
+						void(__fastcall* GetRenderCondition)(fox::gr::dg::Dg*);
+						void(__fastcall* SetRenderCondition)(fox::gr::dg::Dg*);
+						void(__fastcall* meth_170)(fox::gr::dg::Dg*);
+						void(__fastcall* meth_171)(fox::gr::dg::Dg*);
+						void(__fastcall* CreateSubCommandContext)(fox::gr::dg::Dg*);
+						void(__fastcall* meth_173)(fox::gr::dg::Dg*);
+						void(__fastcall* meth_174)(fox::gr::dg::Dg*);
+						void(__fastcall* meth_175)(fox::gr::dg::Dg*);
+						void(__fastcall* meth_176)(fox::gr::dg::Dg*);
+						void(__fastcall* InitTemporaryOutput)(fox::gr::dg::Dg*);
+						void(__fastcall* meth_178)(fox::gr::dg::Dg*);
+					};
+
+					vtable* __vftable;
+					char __pad0[140];
+					fox::gr::TonemapDesc tonemapDesc;
+					char __pad1[140];
+				};
+
+				namespace plugins
+				{
 					struct Draw2DRenderer
 					{
 						char __pad0[720];
@@ -837,18 +1876,26 @@ namespace game
 						Vectormath::Aos::Vector4 viewVec2;
 						BuildDraw2DParameters* parameters;
 						CommandBuffer* commandBuffer;
-						Draw2DRenderer_unk* unk;
-						char __pad1[16];
-						fox::gr::ResourceId shader;
+						RenderStateContext* renderStateContext;
+						Camera* defaultCamera;
+						Camera* camera;
+						ResourceId shader;
 						gn::Buffer* buffer;
 						unsigned int size;
-						char __pad2[14];
+						unsigned int bufferSizeAllocated;
+						unsigned int bufferSizeUsed;
+						char __pad2[4];
+						unsigned short w1;
 						char unk1;
 						char __pad3[5];
 						DynamicVertexBuffer* vertexBuffer;
 						void* ptr1;
-						char __pad4[92];
+						ResourceId unkResource;
+						char __pad4[36];
+						char unk2;
+						char __pad5[51];
 						_TextureGlyphData* glyphData;
+						char __pad6[8];
 					};
 
 					static_assert(offsetof(Draw2DRenderer, glyphData) == 0x3B0);
@@ -1194,8 +2241,9 @@ namespace game
 				Packet2DSetTemporaryTexture() : Packet2D(49, 8) {}
 				char __pad0[4]{};
 			};
-
 		}
+
+		struct MessageBox2;
 
 		namespace impl
 		{
@@ -1228,42 +2276,100 @@ namespace game
 			static_assert(offsetof(TimeSystemImpl, elapsedTimeSinceStartup) == 48);
 			static_assert(offsetof(TimeSystemImpl, frameIndex) == 56);
 
+			namespace message2
+			{
+				struct MessageBox2Impl;
+				struct MessageBox2Impl
+				{
+					struct vtable
+					{
+						void(__fastcall* SendMessageToSubscribers)(fox::impl::message2::MessageBox2Impl*);
+						void(__fastcall* SendMessageTo)(fox::impl::message2::MessageBox2Impl*);
+						void(__fastcall* ResendMessage)(fox::impl::message2::MessageBox2Impl*);
+						void(__fastcall* meth_004)(fox::impl::message2::MessageBox2Impl*);
+						void(__fastcall* __destructor)(fox::impl::message2::MessageBox2Impl*);
+					};
+
+					vtable* __vftable;
+					__int64 unk1;
+					__int64 unk2;
+					unsigned int a1;
+					char a2;
+					char __pad1[3];
+					unsigned int flags;
+					char __pad0[4];
+				};
+
+				struct MessageSystem2Impl;
+				struct MessageSystem2Impl
+				{
+					struct vtable
+					{
+						fox::MessageBox2* (__fastcall* CreateMessageBox)(fox::impl::message2::MessageSystem2Impl*);
+						void(__fastcall* DeleteMessageBox)(fox::impl::message2::MessageSystem2Impl*);
+						void(__fastcall* Subscribe)(fox::impl::message2::MessageSystem2Impl*);
+						void(__fastcall* SendMessage1)(fox::impl::message2::MessageSystem2Impl*);
+						void(__fastcall* SendMessageToSubscribers)(fox::impl::message2::MessageSystem2Impl*);
+						void(__fastcall* DeliverMessages)(fox::impl::message2::MessageSystem2Impl*);
+						void(__fastcall* __destructor)(fox::impl::message2::MessageSystem2Impl*);
+					};
+
+					vtable* __vftable;
+					char __pad0[9064];
+				};
+			}
 		}
 
-		struct StringId_fields
+		struct MessageBox2 : fox::impl::message2::MessageBox2Impl
 		{
-			std::uint32_t l;
-			std::uint32_t h;
+
 		};
 
-		struct StringId
+		struct MessageSystem2 : fox::impl::message2::MessageSystem2Impl
 		{
-			union
+
+		};
+
+		struct MessageBox2DelegateInterface;
+		struct MessageBox2DelegateInterface
+		{
+			struct vtable
 			{
-				StringId_fields f;
-				std::uint64_t id;
+				void(__fastcall* ReceiveMessage)(fox::MessageBox2DelegateInterface*);
+				void(__fastcall* __destructor)(fox::MessageBox2DelegateInterface*);
 			};
+
+			vtable* __vftable;
 		};
 
-		struct Path
+		struct QuarkRecreationCallbackInterface;
+		struct QuarkRecreationCallbackInterface
 		{
-			__int64 id;
+			struct vtable
+			{
+				void(__fastcall* meth_001)(fox::QuarkRecreationCallbackInterface*);
+				void(__fastcall* __destructor)(fox::QuarkRecreationCallbackInterface*);
+			};
+
+			vtable* __vftable;
 		};
 
-		struct KernelString
+		namespace concurrent
 		{
-			const char* buffer;
-			__int64 unk1;
-			__int64 unk2;
-			__int64 unk3;
-		};
+			namespace impl
+			{
+				struct QueueBase
+				{
+					struct vtable
+					{
 
-		struct PathId
-		{
-			std::uint64_t id;
-		};
+					};
 
-		typedef std::uint32_t KeyCode;
+					vtable* __vftable;
+					char __pad0[64];
+				};
+			}
+		}
 
 		namespace uix
 		{
@@ -1567,6 +2673,20 @@ namespace game
 
 			};
 
+			struct SteamUdpSocket
+			{
+				struct SteamUdpAddress
+				{
+					struct vtable
+					{
+
+					};
+
+					vtable* __vftable;
+					steam_id remote;
+				};
+			};
+
 			namespace impl
 			{
 				struct SppSocketImpl_mgo
@@ -1597,25 +2717,6 @@ namespace game
 					SppSocketImpl_mgo mgo;
 				};
 			}
-		};
-
-		template <typename T>
-		struct EntityPtrBase
-		{
-			T* ptr;
-		};
-
-		struct EntityHandle
-		{
-			void* a1;
-		};
-
-		template <typename T>
-		struct Array
-		{
-			std::uint32_t size;
-			std::uint32_t capacity;
-			T** array;
 		};
 
 		namespace nt
@@ -1654,17 +2755,17 @@ namespace game
 
 			struct Member_SessionInterface;
 
-			struct Member_SessionInterface_vtbl
-			{
-				int(__fastcall* GetIndex)(Member* this_);
-				void* (__fastcall* GetIntAnimationController)(Member* this_);
-				void(__fastcall* GetSessionIdString)(Member* this_, char*, void*);
-				void(__fastcall* __destructor)(Member* this_);
-			};
-
 			struct Member_SessionInterface
 			{
-				Member_SessionInterface_vtbl* __vftable;
+				struct vtable
+				{
+					int(__fastcall* GetIndex)(Member_SessionInterface* this_);
+					void* (__fastcall* GetIntAnimationController)(Member_SessionInterface* this_);
+					void(__fastcall* GetSessionIdString)(Member_SessionInterface* this_, char*, void*);
+					void(__fastcall* __destructor)(Member_SessionInterface* this_);
+				};
+
+				vtable* __vftable;
 			};
 
 			struct Member
@@ -1693,6 +2794,17 @@ namespace game
 				void* a2;
 				void* a3;
 				unsigned int size;
+			};
+
+			enum SessionNotify_t
+			{
+				NOTIFY_SESSION_CREATE = 0,
+				NOTIFY_SESSION_CLOSE = 1,
+				NOTIFY_SESSION_DELETE = 2,
+				NOTIFY_UNK3 = 3, // error?/update
+				NOTIFY_JOIN_MEMBER = 4,
+				NOTIFY_DELETE_MEMBER = 5,
+				NOTIFY_COUNT = 6,
 			};
 
 			namespace impl
@@ -1828,9 +2940,9 @@ namespace game
 
 				struct SessionImpl2_SessionInterface_vtbl
 				{
-					void* (__fastcall* GetLocalMemberInterface)(SessionImpl2_SessionInterface* this_);
-					void* (__fastcall* GetHostMemberInterface)(SessionImpl2_SessionInterface* this_);
-					void* (__fastcall* GetMemberInterfaceAtIndex)(SessionImpl2_SessionInterface* this_, void*);
+					Member_SessionInterface* (__fastcall* GetLocalMemberInterface)(SessionImpl2_SessionInterface* this_);
+					Member_SessionInterface* (__fastcall* GetHostMemberInterface)(SessionImpl2_SessionInterface* this_);
+					Member_SessionInterface* (__fastcall* GetMemberInterfaceAtIndex)(SessionImpl2_SessionInterface* this_, int);
 					int(__fastcall* GetMemberCount)(SessionImpl2_SessionInterface* this_);
 					unsigned int(__fastcall* GetOriginalValueCount)(SessionImpl2_SessionInterface* this_);
 					bool(__fastcall* IsHost)(SessionImpl2_SessionInterface* this_);
@@ -1874,7 +2986,7 @@ namespace game
 					fox::nt::Member* hostMember;
 					fox::nt::Group allMembers;
 					fox::nt::Group peerMembers;
-					unsigned int flags;
+					unsigned int state;
 					char sessionIndex;
 					void* a4;
 					int a5;
@@ -1895,9 +3007,274 @@ namespace game
 				};
 
 				static_assert(sizeof(SessionImpl2) == 232);
+
+				struct GameSocketImpl;
+				struct GameSocketImpl
+				{
+					struct Peer
+					{
+
+					};
+
+					struct vtable
+					{
+						void(__fastcall* RequestToSend)(GameSocketImpl*, int, const void*, unsigned int);
+						void(__fastcall* RequestToSendToMember)(GameSocketImpl*, char, int, const void*, unsigned int);
+						void(__fastcall* RequestToSendToMembers)(GameSocketImpl*, int, int, const void*, unsigned int);
+						unsigned int(__fastcall* GetPacketCount)(GameSocketImpl*, unsigned int);
+						unsigned int(__fastcall* GetPacketSize)(GameSocketImpl*, unsigned int, unsigned int);
+						void* (__fastcall* GetPacket)(GameSocketImpl*, unsigned int, unsigned int);
+						unsigned char(__fastcall* GetPacketSender)(GameSocketImpl*, unsigned int, unsigned int);
+						void(__fastcall* SetInterval)(GameSocketImpl*, int, unsigned char, float);
+						void(__fastcall* __destructor)(GameSocketImpl*, char);
+					};
+
+					vtable* __vftable;
+					short a1;
+					short a2;
+					char a3_1;
+					char a3_2;
+					short a4;
+					int a5;
+					int a6;
+					void* buf1;
+					void* buf2;
+				};
 			}
+
+			struct Session : impl::SessionImpl2
+			{
+			};
+
+			template <typename T>
+			struct ObserverContainer
+			{
+
+			};
+
+			template <typename T>
+			struct ObserverBase
+			{
+				struct vtable
+				{
+					void(__fastcall* NotifyImpl)(ObserverBase<T>*, fox::nt::impl::SessionImpl2*, int, unsigned __int8* a4);
+					void(__fastcall* __destructor)(ObserverBase<T>*);
+				};
+				vtable* __vftable;
+				ObserverContainer<T>* container;
+			};
 		}
 	
+		namespace gm
+		{
+			enum PeerType
+			{
+				PEER_LOCAL = 0,
+				PEER_HOST = 1,
+				PEER_AUTHORITY = 2,
+				PEER_ALL = 3,
+				PEER_DIRECT = 4,
+			};
+
+			enum NetType
+			{
+
+			};
+
+			struct GameObjectInterface;
+			struct GameObjectFactoryInterface;
+
+			struct GameObjectMessageSystem
+			{
+				struct vtable
+				{
+					void(__fastcall* __destructor)(GameObjectMessageSystem*);
+					void(__fastcall* SendSignal)(GameObjectMessageSystem*, int* result, __int64 objectId, int peerType, const void* buffer, unsigned __int16 size, int a7, char memberIndex);
+					void(__fastcall* SendToSessionId)(GameObjectMessageSystem*);
+					void(__fastcall* SerialProcessSignals)(GameObjectMessageSystem*);
+				};
+
+				vtable* __vftable;
+			};
+
+			namespace impl
+			{
+				struct GameObjectMessageSystemImpl
+				{
+					struct vtable
+					{
+
+					};
+
+					vtable* __vftable;
+					fox::nt::ObserverBase<fox::nt::Session> sessionObserver;
+					GameObjectMessageSystem messageSystem;
+					fox::nt::impl::GameSocketImpl* sockets[3];
+					char __pad1[104];
+					Mutex mutex;
+					char __pad2[184];
+				};
+
+				struct GameObjectExecutionImpl;
+				struct GameObjectExecutionImpl
+				{
+					struct vtable
+					{
+						void(__fastcall* SetExecutionPriority)(fox::gm::impl::GameObjectExecutionImpl*);
+						void(__fastcall* GetExecutionPriority)(fox::gm::impl::GameObjectExecutionImpl*);
+						void(__fastcall* ProcessSignal)(fox::gm::impl::GameObjectExecutionImpl*);
+						void(__fastcall* IsParallel)(fox::gm::impl::GameObjectExecutionImpl*);
+						void(__fastcall* __destructor)(fox::gm::impl::GameObjectExecutionImpl*);
+					};
+
+					vtable* __vftable;
+					unsigned int a1;
+					unsigned int a2;
+					unsigned int a3;
+					unsigned int a4;
+					unsigned short a5_1;
+					unsigned short a5_2;
+					unsigned int a6;
+					fox::gm::GameObjectInterface* gameObjectInterface;
+					void* unk1;
+					unsigned a7;
+					char __pad1[4];
+				};
+
+
+				struct GameObjectFactoryControllerImpl;
+				struct GameObjectFactoryControllerImpl
+				{
+					struct vtable
+					{
+						void(__fastcall* GetFactoryForTypeId)(fox::gm::impl::GameObjectFactoryControllerImpl*);
+						void(__fastcall* GetFactoryWithTypeIndex)(fox::gm::impl::GameObjectFactoryControllerImpl*);
+						void(__fastcall* __destructor)(fox::gm::impl::GameObjectFactoryControllerImpl*);
+					};
+
+					vtable* __vftable;
+					fox::gm::GameObjectFactoryInterface* factories[128];
+				};
+
+
+				struct GameObjectImpl
+				{
+					struct vtable
+					{
+
+					};
+
+					vtable* __vftable;
+					char __pad0[24];
+					fox::gm::GameObjectInterface* gameObjectInterface;
+					char __pad1[24];
+				};
+
+				struct GameObjectTypeCollector
+				{
+					struct vtable
+					{
+
+					};
+
+					vtable* __vftable;
+					fox::gm::impl::GameObjectImpl* gameObject;
+					char __pad0[56];
+				};
+
+				struct GameObjectControllerImpl;
+				struct GameObjectControllerImpl
+				{
+					struct vtable
+					{
+						void(__fastcall* GameObjectTypeWasRegistered)(fox::gm::impl::GameObjectControllerImpl*, unsigned int, fox::StringId);
+						void(__fastcall* AddGameObjectImpl)(fox::gm::impl::GameObjectControllerImpl*);
+						void(__fastcall* AddGameObjectLocator)(fox::gm::impl::GameObjectControllerImpl*);
+						void(__fastcall* DeleteGameObject)(fox::gm::impl::GameObjectControllerImpl*);
+						fox::gm::GameObjectInterface* (__fastcall* GetGameObjectWithId)(fox::gm::impl::GameObjectControllerImpl*);
+						void(__fastcall* GetGameObjectIdWithInstanceName)(fox::gm::impl::GameObjectControllerImpl*);
+						void(__fastcall* Update)(fox::gm::impl::GameObjectControllerImpl*);
+						void(__fastcall* GetGameObjectLocatorCountToBeAdded)(fox::gm::impl::GameObjectControllerImpl*);
+						void(__fastcall* __destructor)(fox::gm::impl::GameObjectControllerImpl*);
+					};
+
+					vtable* __vftable;
+					fox::MessageBox2* messageBox;
+					fox::MessageBox2DelegateInterface* messageBox2DelegateInterface;
+					fox::QuarkRecreationCallbackInterface* quarkRecreationCallbackInterface;
+					__int64 unk1;
+					__int64 unk2;
+					fox::gm::impl::GameObjectTypeCollector* gameObjectTypeCollectors[128];
+					fox::concurrent::impl::QueueBase gameObjectLocatorQueue;
+				};
+
+			}
+
+			struct GameObjectFactoryInterface
+			{
+				struct vtable
+				{
+					void(__fastcall* __destructor)(fox::gm::GameObjectFactoryInterface*);
+					void(__fastcall* GetGameObjectTypeId)(fox::gm::GameObjectFactoryInterface*);
+					void(__fastcall* GetGameObjectTypeIndex)(fox::gm::GameObjectFactoryInterface*);
+					fox::gm::GameObjectInterface* (__fastcall* CreateGameObject)(fox::gm::GameObjectFactoryInterface*);
+					void(__fastcall* DeleteGameObject)(fox::gm::GameObjectFactoryInterface*);
+				};
+
+				vtable* __vftable;
+			};
+
+			struct GameObjectInterface
+			{
+				struct ExecutionDesc
+				{
+					unsigned short a1;
+					unsigned int a2;
+					unsigned int a3;
+					unsigned int a4;
+					char __pad0[8];
+				};
+
+				struct unk1
+				{
+					char __pad0[40];
+					fox::gm::impl::GameObjectExecutionImpl* execution;
+				};
+
+				struct vtable
+				{
+					void(__fastcall* AllocResources)(fox::gm::GameObjectInterface*);
+					void(__fastcall* FreeResources)(fox::gm::GameObjectInterface*);
+					void(__fastcall* meth_003)(fox::gm::GameObjectInterface*);
+					void(__fastcall* TerminateGameObject)(fox::gm::GameObjectInterface*);
+					void(__fastcall* Activate)(fox::gm::GameObjectInterface*);
+					void(__fastcall* Deactivate)(fox::gm::GameObjectInterface*);
+					void(__fastcall* AddLocators)(fox::gm::GameObjectInterface*);
+					void(__fastcall* RemoveLocators)(fox::gm::GameObjectInterface*);
+					void(__fastcall* GetExecutionDesc)(fox::gm::GameObjectInterface*);
+					void(__fastcall* ExecuteSerially)(fox::gm::GameObjectInterface*);
+					void(__fastcall* ExecuteInParallel)(fox::gm::GameObjectInterface*);
+					void(__fastcall* ExecuteLast)(fox::gm::GameObjectInterface*);
+					void(__fastcall* ExecuteAtInactive)(fox::gm::GameObjectInterface*);
+					void(__fastcall* meth_014)(fox::gm::GameObjectInterface*);
+					void(__fastcall* ProcessSignal)(fox::gm::GameObjectInterface*);
+					void(__fastcall* meth_0016)(fox::gm::GameObjectInterface*);
+					void(__fastcall* ProcessLuaCommand)(fox::gm::GameObjectInterface*);
+					void(__fastcall* GetGameObjectIdWithName)(fox::gm::GameObjectInterface*);
+					void(__fastcall* GetNameIdWithGameObjectId)(fox::gm::GameObjectInterface*);
+					void(__fastcall* GetNameStringIdWithGameObjectId)(fox::gm::GameObjectInterface*);
+					void(__fastcall* meth_021)(fox::gm::GameObjectInterface*);
+					void(__fastcall* meth_022)(fox::gm::GameObjectInterface*);
+					void(__fastcall* meth_023)(fox::gm::GameObjectInterface*);
+					void(__fastcall* __destructor)(fox::gm::GameObjectInterface*);
+				};
+
+				vtable* __vftable;
+				unk1* unk1;
+				char __pad0[184];
+			};
+		}
+
 		namespace ncl
 		{
 #pragma pack(push, 8)
@@ -2040,6 +3417,27 @@ namespace game
 		{
 			namespace impl
 			{
+				struct MbDvcSoundControllerImpl;
+
+				struct MbDvcSoundControllerImpl
+				{
+					struct vtable
+					{
+						void(__fastcall* __destructor)(tpp::ui::menu::impl::MbDvcSoundControllerImpl*);
+						void(__fastcall* Update)(tpp::ui::menu::impl::MbDvcSoundControllerImpl*);
+						void(__fastcall* Stop)(tpp::ui::menu::impl::MbDvcSoundControllerImpl*);
+						void(__fastcall* RequestVoice)(tpp::ui::menu::impl::MbDvcSoundControllerImpl*, unsigned __int8 a2);
+						void(__fastcall* CancelRequestVoice)(tpp::ui::menu::impl::MbDvcSoundControllerImpl*);
+						void(__fastcall* SetDelayTime)(tpp::ui::menu::impl::MbDvcSoundControllerImpl*);
+						void(__fastcall* SetMbDvcOpen)(tpp::ui::menu::impl::MbDvcSoundControllerImpl*);
+						void(__fastcall* SetVoiceInvalid)(tpp::ui::menu::impl::MbDvcSoundControllerImpl*);
+						void(__fastcall* SetAllVoiceInvalid)(tpp::ui::menu::impl::MbDvcSoundControllerImpl*);
+						void(__fastcall* GetVoiceTypeByName)(tpp::ui::menu::impl::MbDvcSoundControllerImpl*);
+					};
+
+					vtable* __vftable;
+				};
+
 				struct MenuSystemImpl
 				{
 					struct vtable
@@ -2151,6 +3549,19 @@ namespace game
 				};
 			}
 
+			struct UiCommonDataManager
+			{
+				struct vtable
+				{
+
+				};
+
+				vtable* __vftable;
+				char __pad0[128];
+				impl::MbDvcSoundControllerImpl* soundController;
+
+			};
+
 			namespace mbm
 			{
 				namespace impl
@@ -2168,11 +3579,53 @@ namespace game
 			}
 		}
 
+		namespace hud
+		{
+			namespace impl
+			{
+				struct HudSystemImpl_mgo_unk1
+				{
+					char __pad0[0x28BD];
+					char showScores;
+				};
+
+				struct HudSystemImpl_mgo
+				{
+					struct vtable
+					{
+
+					};
+
+					vtable* __vftable;
+					char __pad0[0x92B0];
+					HudSystemImpl_mgo_unk1 unk1;
+				};
+
+				struct HudSystemImpl_tpp
+				{
+					struct vtable
+					{
+
+					};
+
+					vtable* __vftable;
+				};
+
+				union HudSystemImpl
+				{
+					HudSystemImpl_tpp tpp;
+					HudSystemImpl_mgo mgo;
+				};
+			}
+		}
+
 		namespace impl
 		{
 			struct UiSystemImpl
 			{
-				char __pad0[80];
+				char __pad0[24];
+				tpp::ui::hud::impl::HudSystemImpl* hudSystem;
+				char __pad1[48];
 				tpp::ui::menu::impl::MenuSystemImpl* menuSystem;
 			};
 		}
@@ -3796,8 +5249,8 @@ namespace game
 			fox::ncl::NclHttpCodec* httpCodec;
 			int state;
 			int mode;
-			fox::StringId unkString;
-			int a5;
+			fox::StringId error;
+			int errorCount;
 			char a6;
 		};
 
@@ -3806,10 +5259,16 @@ namespace game
 			mbm::PlayerBasicInfo* playerInfos;
 			char __pad2[8];
 			short maxPlayers;
-			char __pad3[10];
+			char __pad3[6];
 			SessionConnectInfo* sessionConnectInfo;
+			char __pad4[4];
 			DisplayName* displayName1;
 			DisplayName* displayName2;
+		};
+
+		struct SessionControl : tpp::net::ServerRequestBase
+		{
+		
 		};
 
 		struct PlayerPlatformInfo
@@ -7067,7 +8526,7 @@ namespace game
 					void* (__fastcall* SetOriginalOwner)(tpp::gm::player::impl::EquipControllerImpl_tpp*, unsigned int, int, int);
 					void* (__fastcall* GetOriginalOwner)(tpp::gm::player::impl::EquipControllerImpl_tpp*, unsigned int, int);
 					void* (__fastcall* GetCurrentEquipId)(tpp::gm::player::impl::EquipControllerImpl_tpp*, unsigned int);
-					void* (__fastcall* GetEquipIdSlot)(tpp::gm::player::impl::EquipControllerImpl_tpp*, unsigned int, int, unsigned int);
+					unsigned int (__fastcall* GetEquipIdSlot)(tpp::gm::player::impl::EquipControllerImpl_tpp*, unsigned int, int, unsigned int);
 					void* (__fastcall* SetEquipState)(tpp::gm::player::impl::EquipControllerImpl_tpp*, unsigned int, int, unsigned int, int, unsigned __int8, bool, unsigned __int8);
 					void* (__fastcall* SetSlot)(tpp::gm::player::impl::EquipControllerImpl_tpp*, unsigned int, int, int, int, bool, bool);
 					void* (__fastcall* SetAmmoCount)(tpp::gm::player::impl::EquipControllerImpl_tpp*, unsigned int, int, unsigned int, bool);
@@ -7145,9 +8604,10 @@ namespace game
 					void* (__fastcall* SetOriginalOwner)(tpp::gm::player::impl::EquipControllerImpl_mgo*, unsigned int, int, int);
 					void* (__fastcall* GetOriginalOwner)(tpp::gm::player::impl::EquipControllerImpl_mgo*, unsigned int, int);
 					void* (__fastcall* GetCurrentEquipId)(tpp::gm::player::impl::EquipControllerImpl_mgo*, unsigned int);
-					void* (__fastcall* GetEquipIdSlot)(tpp::gm::player::impl::EquipControllerImpl_mgo*, unsigned int, int, unsigned int);
+					void* pad2[5];
+					unsigned int (__fastcall* GetEquipIdSlot)(tpp::gm::player::impl::EquipControllerImpl_mgo*, unsigned int, int, unsigned int);
 					void* (__fastcall* SetEquipState)(tpp::gm::player::impl::EquipControllerImpl_mgo*, unsigned int, int, unsigned int, int, unsigned __int8, bool, unsigned __int8);
-					void* (__fastcall* SetSlot)(tpp::gm::player::impl::EquipControllerImpl_mgo*, unsigned int, int, int, int, bool, bool);
+					void* (__fastcall* SetSlot)(tpp::gm::player::impl::EquipControllerImpl_mgo*, unsigned int*, int, int, int, bool, bool);
 					void* (__fastcall* SetAmmoCount)(tpp::gm::player::impl::EquipControllerImpl_mgo*, unsigned int, int, unsigned int, bool);
 					void* (__fastcall* GetAmmoStockIndexBySlot)(tpp::gm::player::impl::EquipControllerImpl_mgo*, int, unsigned int);
 					void* (__fastcall* SetAmmoStockCountWithMax)(tpp::gm::player::impl::EquipControllerImpl_mgo*, int, int, unsigned int, unsigned int);
@@ -7208,8 +8668,8 @@ namespace game
 			{
 				struct ButtonMask
 				{
-					int id;
-					int mask;
+					unsigned int id;
+					unsigned int mask;
 				};
 
 				struct vtable
@@ -7219,7 +8679,7 @@ namespace game
 
 				vtable* __vftable;
 				char __pad0[32];
-				int mask;
+				unsigned int mask;
 				char __pad1[660];
 				ButtonMask buttonMasks[8];
 				char __pad2[432];
@@ -7902,16 +9362,6 @@ namespace game
 		};
 	}
 
-	namespace gn
-	{
-		struct swapchain
-		{
-			char __pad0[24];
-			IDXGISwapChain* swapChain;
-		};
-
-	}
-
 	namespace fox
 	{
 		struct ApplicationSystem_mgo
@@ -8099,7 +9549,7 @@ namespace game
 			void* __system_21;
 			void* __system_22;
 			void* __system_23;
-			void* __system_24;
+			fox::impl::message2::MessageSystem2Impl* messageSystem2;
 			void* __system_25;
 			void* uixSystem;
 			void* eventTimerSystem;
@@ -8155,24 +9605,40 @@ namespace game
 			char __pad0[32];
 		};
 
+		struct Ruleset_Player
+		{
+
+		};
+
+		struct Ruleset_unk2
+		{
+			char __pad0[24];
+			void* rulesetData;
+		};
+
 		struct Ruleset
 		{
-			char __pad0[88];
+			char __pad0[56];
+			Ruleset_unk2* unk2;
+			char __pad9[24];
 			Ruleset_unk1 unk1;
 			char __pad1[64];
 			int numTeams;
 			TeamInfo** teams;
 			char __pad2[20];
 			int numPlayers;
-			char __pad3[136];
+			tpp::mp::Ruleset_Player** players;
+			char __pad3[128];
 			int a1;
-			char __pad4[88];
+			char __pad4[68];
+			fox::Script* script;
+			char __pad5[12];
 			int state;
-			char __pad5[60];
+			char __pad6[60];
 			unsigned char currentRound;
-			char __pad6[9];
+			char __pad7[9];
 			unsigned char localPlayerSessionIndex;
-			char __pad7[961];
+			char __pad8[961];
 			char playerTeams[16];
 		};
 
@@ -8274,6 +9740,28 @@ namespace game
 	};
 
 #pragma pack(push, 1)
+	struct mgo_match_data_member_t
+	{
+		char unk[8];
+		char name[32];
+		char __pad0[5];
+		steam_id id;
+		char __pad1[9];
+	};
+#pragma pack(pop)
+
+#pragma pack(push, 1)
+	struct mgo_match_data_t
+	{
+		match_slot_t slot;
+		match_rules_t rules;
+		mgo_match_data_member_t members[16];
+		char member_num;
+		char member_limit;
+	};
+#pragma pack(pop)
+
+#pragma pack(push, 1)
 	struct mgo_match_t
 	{
 		int error1;
@@ -8296,7 +9784,8 @@ namespace game
 		char __pad6[2];
 		match_rules_t match_rules;
 		steam_id lobby_id2;
-		char __pad7[420];
+		char __pad7[412];
+		mgo_match_data_t* data;
 		steam_id kicked_ids[16];
 		int kick_num;
 		char __pad8[852];
@@ -8465,4 +9954,3 @@ namespace game
 	static_assert(offsetof(match_settings_t, member_max) == 32);
 	static_assert(offsetof(mgo_matchmaking_manager, state) == 5500);
 }
-

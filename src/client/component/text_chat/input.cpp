@@ -7,6 +7,8 @@
 #include "ui.hpp"
 #include "lobby.hpp"
 #include "../session.hpp"
+#include "../binds.hpp"
+#include "../renderer/fonts.hpp"
 
 #include <utils/hook.hpp>
 #include <utils/string.hpp>
@@ -15,9 +17,9 @@ namespace text_chat::input
 {
 	namespace
 	{
-		void handle_char(chat_state_t& state, char c)
+		void handle_char(chat_state_t& state, wchar_t c)
 		{
-			if (std::strlen(state.input) >= chat_message_max_len)
+			if (std::wcslen(state.input) >= chat_message_max_len)
 			{
 				return;
 			}
@@ -40,13 +42,13 @@ namespace text_chat::input
 			}
 
 			std::memmove(state.input + state.cursor - 1, state.input + state.cursor,
-				std::strlen(state.input) + 1 - state.cursor);
+				std::wcslen(state.input) + 1 - state.cursor);
 			state.cursor--;
 		}
 
 		void handle_tab(chat_state_t& state)
 		{
-			std::string input = state.input;
+			std::string input = utils::string::convert(state.input);
 			const auto space_index = input.find_last_of(' ');
 			if (space_index != std::string::npos)
 			{
@@ -65,25 +67,25 @@ namespace text_chat::input
 			{
 				return;
 			}
-
-			if (name.size() >= sizeof(state.input) - 1)
+			
+			const auto name_w = utils::string::utf8_to_utf16(name);
+			if (name_w.size() >= sizeof(state.input) - 1)
 			{
 				return;
 			}
 
 			state.cursor -= static_cast<int>(input.size());
 
-			for (auto c : name)
+			for (auto& c : name_w)
 			{
 				if (state.cursor >= chat_message_max_len)
 				{
 					return;
 				}
 
-				c = utils::string::normalize_ascii_extended(c);
-				if (utils::string::is_char_text(c))
+				if (renderer::is_char_printable(c))
 				{
-					state.input[state.cursor++] = c;
+					state.input[state.cursor++] = static_cast<wchar_t>(c);
 				}
 			}
 
@@ -102,7 +104,7 @@ namespace text_chat::input
 
 		void handle_paste(chat_state_t& state)
 		{
-			const auto clipboard = utils::string::get_clipboard_data();
+			const auto clipboard = utils::string::get_clipboard_data_w();
 
 			for (auto c : clipboard)
 			{
@@ -111,8 +113,7 @@ namespace text_chat::input
 					return;
 				}
 
-				c = utils::string::normalize_ascii_extended(c);
-				if (utils::string::is_char_text(c))
+				if (renderer::is_char_printable(c))
 				{
 					handle_char(state, c);
 				}
@@ -164,8 +165,8 @@ namespace text_chat::input
 
 			if (state.history_index != -1)
 			{
-				strncpy_s(state.input, state.history.at(state.history_index).data(), sizeof(state.input));
-				state.cursor = static_cast<int>(std::strlen(state.input));
+				wcsncpy_s(state.input, state.history.at(state.history_index).data(), sizeof(state.input));
+				state.cursor = static_cast<int>(std::wcslen(state.input));
 			}
 		}
 
@@ -181,8 +182,8 @@ namespace text_chat::input
 
 			if (state.history_index != -1)
 			{
-				strncpy_s(state.input, state.history.at(state.history_index).data(), sizeof(state.input));
-				state.cursor = static_cast<int>(strlen(state.input));
+				wcsncpy_s(state.input, state.history.at(state.history_index).data(), sizeof(state.input));
+				state.cursor = static_cast<int>(std::wcslen(state.input));
 			}
 		}
 
@@ -215,6 +216,15 @@ namespace text_chat::input
 		{
 			state.cursor = 0;
 			std::memset(state.input, 0, sizeof(state.input));
+		}
+
+		void close_menus()
+		{
+			if (game::environment::is_mgo())
+			{
+				const auto hud_system = game::fox::GetQuarkSystemTable()->applicationSystem->mgo.uiSystem->hudSystem;
+				hud_system->mgo.unk1.showScores &= ~1;
+			}
 		}
 	}
 
@@ -279,7 +289,7 @@ namespace text_chat::input
 				return false;
 			}
 
-			if (!is_down || key >= 0xFF)
+			if (!is_down)
 			{
 				return true;
 			}
@@ -297,8 +307,8 @@ namespace text_chat::input
 				break;
 			default:
 			{
-				const auto c = utils::string::normalize_ascii_extended(static_cast<char>(key));
-				if (utils::string::is_char_text(c))
+				const auto c = static_cast<wchar_t>(key);
+				if (renderer::is_char_printable(c))
 				{
 					handle_char(state, c);
 				}
@@ -353,7 +363,7 @@ namespace text_chat::input
 
 		void start() override
 		{
-			if (!game::environment::is_mgo() || game::environment::is_dedi())
+			if (game::environment::is_dedi())
 			{
 				return;
 			}
@@ -375,6 +385,8 @@ namespace text_chat::input
 					return;
 				}
 
+				binds::release_all_keys();
+				close_menus();
 				chat_state.access([](chat_state_t& state)
 				{
 					stop_typing(state);
@@ -383,20 +395,25 @@ namespace text_chat::input
 				});
 			});
 
-			command::add("chatteam", []
+			if (game::environment::is_mgo())
 			{
-				if (!is_chat_enabled() || !can_use_chat())
+				command::add("chatteam", []
 				{
-					return;
-				}
+					if (!is_chat_enabled() || !can_use_chat())
+					{
+						return;
+					}
 
-				chat_state.access([](chat_state_t& state)
-				{
-					stop_typing(state);
-					state.is_typing = true;
-					state.mode = mode_chat_team;
+					binds::release_all_keys();
+					close_menus();
+					chat_state.access([](chat_state_t& state)
+					{
+						stop_typing(state);
+						state.is_typing = true;
+						state.mode = mode_chat_team;
+					});
 				});
-			});
+			}
 		}
 	};
 }
