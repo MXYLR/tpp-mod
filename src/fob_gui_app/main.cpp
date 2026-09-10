@@ -184,6 +184,16 @@ namespace fob_gui
 	bool has_session = false;
 	char status_text[256] = "Ready";
 	char input_text[512] = "";
+
+	// FOB occupy (guarded by data_mutex where noted)
+	char occupy_steam_input[64] = "";
+	std::atomic<bool> occupy_active{ false };
+	bool occupy_established = false;
+	uint64_t occupy_steam_id = 0;
+	uint64_t occupy_player_id = 0;
+	uint64_t occupy_mother_base_id = 0;
+	uint64_t occupy_count = 0;
+	std::string occupy_status_msg;
 	std::vector<CommandInfo> commands_list;
 	std::set<std::string> filtered_cmds;
 	char filter_buf[64] = "";
@@ -320,6 +330,7 @@ namespace fob_gui
 	std::atomic<bool> show_settings_dialog{ false };
 	std::atomic<bool> show_cheats_dialog{ false };
 	std::atomic<bool> show_fob_dialog{ false };
+	std::atomic<bool> show_exchange_dialog{ false };
 	std::string settings_status_msg;
 
 	inline std::atomic<bool>& stop_music_active()
@@ -576,6 +587,156 @@ namespace fob_gui
 		{
 			stop_music_active().store(response == "1");
 		}
+	}
+
+	void set_status(const char* text);
+
+	void parse_occupy_status(const std::string& info)
+	{
+		std::lock_guard<std::mutex> lock(data_mutex);
+		occupy_status_msg.clear();
+		// format: active:%d;established:%d;steam_id:%llu;player_id:%llu;mother_base_id:%llu;count:%llu;msg:%s
+		size_t p = 0;
+		while (p < info.size())
+		{
+			size_t e = info.find(';', p);
+			std::string part = (e == std::string::npos) ? info.substr(p) : info.substr(p, e - p);
+			size_t c = part.find(':');
+			if (c != std::string::npos)
+			{
+				std::string key = part.substr(0, c);
+				std::string val = part.substr(c + 1);
+				if (key == "active") occupy_active.store(val == "1");
+				else if (key == "established") occupy_established = (val == "1");
+				else if (key == "steam_id") { try { occupy_steam_id = std::stoull(val); } catch (...) {} }
+				else if (key == "player_id") { try { occupy_player_id = std::stoull(val); } catch (...) {} }
+				else if (key == "mother_base_id") { try { occupy_mother_base_id = std::stoull(val); } catch (...) {} }
+				else if (key == "count") { try { occupy_count = std::stoull(val); } catch (...) {} }
+				else if (key == "msg") occupy_status_msg = val;
+			}
+			if (e == std::string::npos) break;
+			p = e + 1;
+		}
+	}
+
+	void sync_occupy_status()
+	{
+		if (!connected.load()) return;
+		std::string response;
+		if (send_command("GET_OCCUPY_STATUS", response))
+		{
+			parse_occupy_status(response);
+		}
+	}
+
+	void set_occupy_target()
+	{
+		if (!connected.load())
+		{
+			set_status("Not connected");
+			return;
+		}
+
+		std::string sid = occupy_steam_input;
+		size_t start = sid.find_first_not_of(" \t");
+		if (start == std::string::npos)
+		{
+			set_status("Enter a steam id first");
+			return;
+		}
+		sid = sid.substr(start);
+		if (sid.empty())
+		{
+			set_status("Enter a steam id first");
+			return;
+		}
+
+		std::string response;
+		std::string cmd = "OCCUPY_SET_STEAMID:" + sid;
+		if (!send_command(cmd, response))
+		{
+			set_status("Send failed");
+			return;
+		}
+		if (response == "NOT_CACHED")
+		{
+			set_status("Steam id not in cache - browse FOB lists first");
+			return;
+		}
+		if (response == "NO_SESSION")
+		{
+			set_status("No session key yet");
+			return;
+		}
+		if (response == "INVALID")
+		{
+			set_status("Invalid steam id");
+			return;
+		}
+
+		// OK|name|player_id|mother_base_id
+		size_t p1 = response.find('|');
+		size_t p2 = (p1 == std::string::npos) ? std::string::npos : response.find('|', p1 + 1);
+		size_t p3 = (p2 == std::string::npos) ? std::string::npos : response.find('|', p2 + 1);
+		if (p1 == std::string::npos || p2 == std::string::npos || p3 == std::string::npos)
+		{
+			set_status("Unexpected response from DLL");
+			return;
+		}
+
+		{
+			std::lock_guard<std::mutex> lock(data_mutex);
+			try { occupy_steam_id = std::stoull(sid); } catch (...) {}
+			try { occupy_player_id = std::stoull(response.substr(p2 + 1, p3 - p2 - 1)); } catch (...) {}
+			try { occupy_mother_base_id = std::stoull(response.substr(p3 + 1)); } catch (...) {}
+		}
+
+		std::string name = response.substr(p1 + 1, p2 - p1 - 1);
+		char buf[256];
+		snprintf(buf, sizeof(buf), "Occupy target set: %s", name.c_str());
+		set_status(buf);
+		sync_occupy_status();
+	}
+
+	void toggle_occupy()
+	{
+		if (!connected.load())
+		{
+			set_status("Not connected");
+			return;
+		}
+
+		std::string response;
+		if (send_command("OCCUPY_TOGGLE", response))
+		{
+			if (response == "STARTED")
+			{
+				occupy_active.store(true);
+				set_status("Occupy started");
+			}
+			else if (response == "STOPPED")
+			{
+				occupy_active.store(false);
+				set_status("Occupy stopped");
+			}
+			else if (response == "NO_TARGET")
+			{
+				set_status("Set occupy target first");
+			}
+			else if (response == "NO_SESSION")
+			{
+				set_status("No session key yet");
+			}
+			else
+			{
+				set_status("Occupy toggle failed");
+			}
+		}
+		else
+		{
+			set_status("Send failed");
+		}
+		sync_occupy_status();
 	}
 
 	void fetch_commands()
@@ -848,6 +1009,7 @@ namespace fob_gui
 					return;
 				}
 				fetch_logs();
+				sync_occupy_status();
 			}
 		}
 	}
@@ -1923,6 +2085,126 @@ namespace fob_gui
 		}
 	}
 
+	void render_exchange_dialog()
+	{
+		if (!show_exchange_dialog.load())
+			return;
+
+		static char ex_type[16] = "4";
+		static char ex_uid[16] = "19092";
+		static char ex_num[16] = "1";
+		static char ex_common[16] = "0";
+		static char ex_event[16] = "1";
+		static char ex_result[4096] = "";
+		static std::string ex_status;
+
+		ImGui::OpenPopup("Exchange Probe");
+		ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+		ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+		ImGui::SetNextWindowSize(ImVec2(popup_w() * 1.25f, popup_h() + 150 * scale_factor), ImGuiCond_Appearing);
+
+		if (ImGui::BeginPopupModal("Exchange Probe", nullptr, ImGuiWindowFlags_None))
+		{
+			ImGui::TextWrapped("Sends a custom CMD_EXCHANGE_LEAGUE_POINT2 to the official server. "
+				"Use this to probe the server's exchange validation (price lookup, num_to_exchange bounds, "
+				"uint32 overflow, is_event table switching).");
+
+			ImGui::Separator();
+
+			// Parameter inputs
+			auto field = [](const char* label, const char* id, char* buf, size_t size, const char* hint)
+			{
+				ImGui::Text("%s", label);
+				ImGui::SameLine();
+				ImGui::SetNextItemWidth(200 * scale_factor);
+				ImGui::InputTextWithHint(id, hint, buf, size, ImGuiInputTextFlags_CharsDecimal);
+			};
+
+			field("type:", "##ex_type", ex_type, sizeof(ex_type), "e.g. 4");
+			field("unique_id:", "##ex_uid", ex_uid, sizeof(ex_uid), "e.g. 19092");
+			field("num_to_exchange:", "##ex_num", ex_num, sizeof(ex_num), "e.g. 1 (max 4294967295)");
+			field("common_value:", "##ex_common", ex_common, sizeof(ex_common), "e.g. 0");
+			field("is_event:", "##ex_event", ex_event, sizeof(ex_event), "0 = PF league, 1 = FOB event");
+
+			ImGui::Separator();
+
+			// Preset quick buttons
+			ImGui::Text("Presets:");
+			auto preset = [&](const char* label, const char* t, const char* u, const char* n, const char* c, const char* e)
+			{
+				if (ImGui::SmallButton(label))
+				{
+					strncpy_s(ex_type, sizeof(ex_type), t, _TRUNCATE);
+					strncpy_s(ex_uid, sizeof(ex_uid), u, _TRUNCATE);
+					strncpy_s(ex_num, sizeof(ex_num), n, _TRUNCATE);
+					strncpy_s(ex_common, sizeof(ex_common), c, _TRUNCATE);
+					strncpy_s(ex_event, sizeof(ex_event), e, _TRUNCATE);
+				}
+				ImGui::SameLine();
+			};
+
+			preset("Normal##ex", "4", "19092", "1", "0", "1");
+			preset("Overflow##ex", "4", "19092", "4294967295", "0", "1");
+			preset("Num=0##ex", "1", "1", "0", "9", "1");
+			preset("Type3 blue##ex", "3", "13070", "1", "0", "1");
+			preset("Type1 item##ex", "1", "1", "1", "9", "1");
+			preset("League##ex", "4", "19092", "1", "0", "0");
+			ImGui::NewLine();
+
+			if (ImGui::Button("Send##ex", ImVec2(btn_w(), btn_h())))
+			{
+				std::string cmd = "EXCHANGE_PROBE:";
+				cmd += ex_type; cmd += "|";
+				cmd += ex_uid; cmd += "|";
+				cmd += ex_num; cmd += "|";
+				cmd += ex_common; cmd += "|";
+				cmd += ex_event;
+
+				std::string response;
+				if (send_command(cmd, response))
+				{
+					strncpy_s(ex_result, sizeof(ex_result), response.c_str(), _TRUNCATE);
+					ex_status = "Response received";
+				}
+				else
+				{
+					strncpy_s(ex_result, sizeof(ex_result), "Send failed (pipe error)", _TRUNCATE);
+					ex_status = "Send failed";
+				}
+			}
+			if (ImGui::IsItemHovered())
+				ImGui::SetTooltip("Send the probe request to the tpp-mod DLL, which forwards it to the official server");
+
+			ImGui::SameLine();
+			if (ImGui::Button("Clear##ex", ImVec2(btn_w() * 0.8f, btn_h())))
+			{
+				ex_result[0] = '\0';
+				ex_status.clear();
+			}
+
+			if (!ex_status.empty())
+				ImGui::TextDisabled("%s", ex_status.c_str());
+
+			ImGui::Text("Response:");
+			float result_h = ImGui::GetContentRegionAvail().y - 40 * scale_factor;
+			if (ImGui::BeginChild("##ex_result", ImVec2(0, result_h), true))
+			{
+				ImGui::TextWrapped("%s", ex_result);
+			}
+			ImGui::EndChild();
+
+			ImGui::Separator();
+			if (ImGui::Button("Close##ex", ImVec2(btn_w(), btn_h())))
+			{
+				show_exchange_dialog.store(false);
+				ex_status.clear();
+				ImGui::CloseCurrentPopup();
+			}
+
+			ImGui::EndPopup();
+		}
+	}
+
 	void render_gui()
 	{
 		static bool show_test_window = false;
@@ -1947,6 +2229,7 @@ namespace fob_gui
 		render_settings_dialog();
 		render_cheats_dialog();
 		render_fob_dialog();
+		render_exchange_dialog();
 
 		ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
 		ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize, ImGuiCond_Always);
@@ -2061,6 +2344,14 @@ namespace fob_gui
 				ImGui::SetTooltip("Open FOB commands panel: add support, open wormhole, convert list");
 
 			ImGui::SameLine();
+			if (ImGui::Button("Exchange##btn"))
+			{
+				show_exchange_dialog.store(true);
+			}
+			if (ImGui::IsItemHovered())
+				ImGui::SetTooltip("Open exchange probe panel: send custom CMD_EXCHANGE_LEAGUE_POINT2 to the official server");
+
+			ImGui::SameLine();
 			{
 				bool is_active = stop_music_active().load();
 				std::string btn_label = is_active ? "Music: ON" : "Music: OFF";
@@ -2076,6 +2367,49 @@ namespace fob_gui
 				}
 				if (ImGui::IsItemHovered())
 					ImGui::SetTooltip("Toggle music kill loop (script_exec TppMusicManager.StopMusic every 1s)");
+			}
+
+			ImGui::Separator();
+			ImGui::Text("=== FOB Occupy ===");
+
+			ImGui::Text("Steam ID:");
+			ImGui::SameLine();
+			ImGui::SetNextItemWidth(200 * scale_factor);
+			ImGui::InputTextWithHint("##occupy_sid", "76561198xxxxxxxx", occupy_steam_input,
+				sizeof(occupy_steam_input), ImGuiInputTextFlags_CharsDecimal);
+			ImGui::SameLine();
+			if (ImGui::Button("Set Target##occupy"))
+			{
+				set_occupy_target();
+			}
+			if (ImGui::IsItemHovered())
+				ImGui::SetTooltip("Resolve steam id to player_id/mother_base_id via the DLL cache (browse FOB lists first if NOT_CACHED)");
+
+			{
+				std::lock_guard<std::mutex> lock(data_mutex);
+				ImGui::Text("player_id:");
+				ImGui::SameLine();
+				ImGui::Text("%llu", (unsigned long long)occupy_player_id);
+				ImGui::Text("mother_base_id:");
+				ImGui::SameLine();
+				ImGui::Text("%llu", (unsigned long long)occupy_mother_base_id);
+			}
+
+			bool occ_active = occupy_active.load();
+			std::string occ_btn = occ_active ? "Occupy: ON" : "Occupy: OFF";
+			if (ImGui::Button(occ_btn.c_str()))
+			{
+				toggle_occupy();
+			}
+			if (ImGui::IsItemHovered())
+				ImGui::SetTooltip("Hold your own FOB by issuing CMD_GET_FOB_TARGET_DETAIL (ACTUAL) + session heartbeats every 45s; aborts on stop");
+
+			{
+				std::lock_guard<std::mutex> lock(data_mutex);
+				ImGui::Text("Established: %s   Cycles: %llu", occupy_established ? "Yes" : "No",
+					(unsigned long long)occupy_count);
+				if (!occupy_status_msg.empty())
+					ImGui::TextDisabled("Status: %s", occupy_status_msg.c_str());
 			}
 
 			ImGui::Separator();

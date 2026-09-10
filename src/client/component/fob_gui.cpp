@@ -19,6 +19,7 @@
 #include <sstream>
 #include <map>
 #include <deque>
+#include <vector>
 #include <shellapi.h>
 
 #pragma comment(lib, "user32.lib")
@@ -38,10 +39,21 @@ namespace fob_control
 		std::atomic<bool> stop_music_active{ false };
 		std::thread stop_music_thread;
 
+		std::atomic<bool> occupy_active{ false };
+		std::atomic<bool> occupy_established{ false };
+		std::atomic<uint64_t> occupy_count{ 0 };
+		std::thread occupy_thread;
+
 		std::mutex data_mutex;
 		uint64_t target_player_id = 0;
 		uint64_t target_steam_id = 0;
 		uint64_t my_player_id = 0;
+
+		// FOB occupy target (guarded by data_mutex)
+		uint64_t occupy_steam_id = 0;
+		uint32_t occupy_player_id = 0;
+		uint32_t occupy_mother_base_id = 0;
+		std::string occupy_status_msg = "Idle";
 
 		constexpr size_t MAX_LOG_ENTRIES = 1000;
 		struct log_entry
@@ -262,6 +274,261 @@ namespace fob_control
 			}
 		}
 
+		// FOB occupy (defense against infiltrators):
+		// CMD_GET_FOB_TARGET_DETAIL (mode=ACTUAL) on the target base marks it as
+		// being infiltrated; as long as the player session is kept alive with
+		// CMD_UPDATE_SESSION, no one else can infiltrate it.
+		// CMD_ABORT_MOTHER_BASE releases the occupation.
+		// Runs on its own thread (1 MB stack) using the standalone TPP client,
+		// which never touches the game's NclDaemon structures directly.
+		bool occupy_send_session_command(const nlohmann::json& data, nlohmann::json& response)
+		{
+			try
+			{
+				auto resp = server_logging::send_session_command(data);
+				if (!resp.has_value())
+				{
+					return false;
+				}
+				response = *resp;
+				return true;
+			}
+			catch (...)
+			{
+				return false;
+			}
+		}
+
+		void set_occupy_status(const std::string& msg)
+		{
+			std::lock_guard<std::mutex> lock(data_mutex);
+			occupy_status_msg = msg;
+		}
+
+		void stop_occupy();
+
+		std::string occupy_resolve_and_store(uint64_t steam_id)
+		{
+			if (!server_logging::has_session_key())
+			{
+				return "NO_SESSION";
+			}
+
+			auto cached = fob_target::get_cached_player(steam_id);
+			if (!cached.has_value())
+			{
+				return "NOT_CACHED";
+			}
+
+			{
+				std::lock_guard<std::mutex> lock(data_mutex);
+				occupy_steam_id = steam_id;
+				occupy_player_id = cached->player_id;
+				occupy_mother_base_id = cached->mother_base_id;
+				target_steam_id = steam_id;
+				target_player_id = cached->player_id;
+				occupy_status_msg = "Target resolved";
+			}
+
+			std::ostringstream oss;
+			oss << "OK|" << cached->name << "|" << cached->player_id << "|" << cached->mother_base_id;
+			return oss.str();
+		}
+
+		std::string get_occupy_status_str()
+		{
+			std::lock_guard<std::mutex> lock(data_mutex);
+			char buf[512];
+			snprintf(buf, sizeof(buf),
+				"active:%d;established:%d;steam_id:%llu;player_id:%llu;mother_base_id:%llu;count:%llu;msg:%s",
+				occupy_active.load() ? 1 : 0,
+				occupy_established.load() ? 1 : 0,
+				(unsigned long long)occupy_steam_id,
+				(unsigned long long)occupy_player_id,
+				(unsigned long long)occupy_mother_base_id,
+				(unsigned long long)occupy_count.load(),
+				occupy_status_msg.c_str());
+			return std::string(buf);
+		}
+
+		// Worker running on its own thread (default 1 MB stack). Sends the
+		// occupation heartbeat every 45 s and sends CMD_ABORT_MOTHER_BASE when
+		// the occupation is stopped.
+		void occupy_worker()
+		{
+			auto last_cycle = std::chrono::steady_clock::now() - std::chrono::seconds(50);
+
+			while (occupy_active.load())
+			{
+				const auto now = std::chrono::steady_clock::now();
+				if (now - last_cycle >= std::chrono::seconds(45))
+				{
+					last_cycle = now;
+
+					try
+					{
+						uint32_t mother_base_id = 0;
+						{
+							std::lock_guard<std::mutex> lock(data_mutex);
+							mother_base_id = occupy_mother_base_id;
+						}
+
+						if (mother_base_id == 0)
+						{
+							set_occupy_status("No target mother_base_id");
+							continue;
+						}
+
+						// Establish / refresh the occupation mark
+						nlohmann::json detail;
+						detail["high_rank"] = 1134;
+						detail["is_event"] = 0;
+						detail["is_plus"] = 1;
+						detail["is_sneak"] = 1;
+						detail["mode"] = "ACTUAL";
+						detail["mother_base_id"] = mother_base_id;
+						detail["msgid"] = "CMD_GET_FOB_TARGET_DETAIL";
+						detail["rqid"] = 0;
+
+						nlohmann::json detail_resp;
+						if (occupy_send_session_command(detail, detail_resp))
+						{
+							const auto result = detail_resp.value("result", "");
+							int is_invalid = 1;
+							if (detail_resp.contains("session") && detail_resp["session"].is_object())
+							{
+								is_invalid = detail_resp["session"].value("is_invalid", 1);
+							}
+
+							if (result == "NOERR")
+							{
+								occupy_established.store(true);
+								occupy_count.fetch_add(1);
+								if (is_invalid == 0)
+								{
+									set_occupy_status("Occupying (NOERR, session valid)");
+								}
+								else
+								{
+									set_occupy_status("DETAIL NOERR but session invalid");
+								}
+							}
+							else
+							{
+								occupy_established.store(false);
+								set_occupy_status("DETAIL failed: " + result);
+							}
+						}
+						else
+						{
+							occupy_established.store(false);
+							set_occupy_status("DETAIL request failed (no response)");
+						}
+
+						// Keep the player session alive
+						nlohmann::json session;
+						session["msgid"] = "CMD_UPDATE_SESSION";
+						session["rqid"] = 0;
+						nlohmann::json session_resp;
+						if (occupy_send_session_command(session, session_resp))
+						{
+							const auto result = session_resp.value("result", "");
+							if (result != "NOERR")
+							{
+								set_occupy_status("Heartbeat failed: " + result);
+							}
+						}
+						else
+						{
+							set_occupy_status("Heartbeat request failed");
+						}
+					}
+					catch (...)
+					{
+						set_occupy_status("Occupy exception");
+					}
+				}
+
+				std::this_thread::sleep_for(std::chrono::milliseconds(500));
+			}
+
+			// Occupation stopped: release the base
+			if (occupy_established.load())
+			{
+				nlohmann::json abort;
+				abort["msgid"] = "CMD_ABORT_MOTHER_BASE";
+				abort["rqid"] = 0;
+				nlohmann::json abort_resp;
+				if (occupy_send_session_command(abort, abort_resp))
+				{
+					const auto result = abort_resp.value("result", "");
+					if (result == "NOERR")
+					{
+						set_occupy_status("Released");
+					}
+					else
+					{
+						set_occupy_status("Release failed: " + result);
+					}
+				}
+				else
+				{
+					set_occupy_status("Release request failed");
+				}
+				occupy_established.store(false);
+			}
+			else
+			{
+				set_occupy_status("Stopped");
+			}
+		}
+
+		std::string toggle_occupy()
+		{
+			if (!server_logging::has_session_key())
+			{
+				return "NO_SESSION";
+			}
+
+			if (occupy_active.load())
+			{
+				stop_occupy();
+				return "STOPPED";
+			}
+
+			{
+				std::lock_guard<std::mutex> lock(data_mutex);
+				if (occupy_mother_base_id == 0)
+				{
+					return "NO_TARGET";
+				}
+			}
+
+			occupy_established.store(false);
+			occupy_count.store(0);
+			occupy_active.store(true);
+			if (occupy_thread.joinable())
+			{
+				occupy_thread.join();
+			}
+			occupy_thread = std::thread(occupy_worker);
+			return "STARTED";
+		}
+
+		void stop_occupy()
+		{
+			if (!occupy_active.load())
+			{
+				return;
+			}
+
+			occupy_active.store(false);
+			if (occupy_thread.joinable())
+			{
+				occupy_thread.join();
+			}
+		}
+
 		void update_my_player_id()
 		{
 			if (server_logging::has_session_key())
@@ -388,6 +655,32 @@ namespace fob_control
 			{
 				return "PONG";
 			}
+			if (cmd == "GET_OCCUPY_STATUS")
+			{
+				return get_occupy_status_str();
+			}
+			if (cmd.rfind("OCCUPY_SET_STEAMID:", 0) == 0)
+			{
+				std::string value = cmd.substr(19);
+				try
+				{
+					uint64_t steam_id = std::stoull(value);
+					return occupy_resolve_and_store(steam_id);
+				}
+				catch (...)
+				{
+					return "INVALID";
+				}
+			}
+			if (cmd == "OCCUPY_TOGGLE")
+			{
+				return toggle_occupy();
+			}
+			if (cmd == "OCCUPY_STOP")
+			{
+				stop_occupy();
+				return "STOPPED";
+			}
 			if (cmd.rfind("SET_TARGET:", 0) == 0)
 			{
 				std::string value = cmd.substr(11);
@@ -482,6 +775,73 @@ namespace fob_control
 				}
 				return oss.str();
 			}
+			// Exchange probe: send a custom CMD_EXCHANGE_LEAGUE_POINT2 request to
+			// the official server. Format:
+			//   EXCHANGE_PROBE:type|unique_id|num_to_exchange|common_value|is_event
+			// Returns the raw response JSON (or FAILED/NO_SESSION).
+			if (cmd.rfind("EXCHANGE_PROBE:", 0) == 0)
+			{
+				if (!server_logging::has_session_key())
+				{
+					return "NO_SESSION";
+				}
+
+				std::istringstream iss(cmd.substr(15));
+				std::string part;
+				std::vector<std::string> parts;
+				while (std::getline(iss, part, '|'))
+				{
+					parts.push_back(part);
+				}
+
+				try
+				{
+					const auto parse_u32 = [](const std::string& s)
+					{
+						unsigned long long v = std::stoull(s);
+						if (v > 0xFFFFFFFFull)
+						{
+							throw std::out_of_range("value too large");
+						}
+						return static_cast<std::uint32_t>(v);
+					};
+
+					std::uint32_t type = parts.size() > 0 ? parse_u32(parts[0]) : 0;
+					std::uint32_t unique_id = parts.size() > 1 ? parse_u32(parts[1]) : 0;
+					std::uint32_t num_to_exchange = parts.size() > 2 ? parse_u32(parts[2]) : 1;
+					std::uint32_t common_value = parts.size() > 3 ? parse_u32(parts[3]) : 0;
+					std::uint32_t is_event = parts.size() > 4 ? parse_u32(parts[4]) : 1;
+
+					nlohmann::json req;
+					req["msgid"] = "CMD_EXCHANGE_LEAGUE_POINT2";
+					req["rqid"] = 0;
+					req["type"] = type;
+					req["unique_id"] = unique_id;
+					req["num_to_exchange"] = num_to_exchange;
+					req["common_value"] = common_value;
+					req["is_event"] = is_event;
+
+					char log_buf[256];
+					snprintf(log_buf, sizeof(log_buf),
+						"EXCHANGE_PROBE sending: type=%u unique_id=%u num=%u common=%u is_event=%u",
+						type, unique_id, num_to_exchange, common_value, is_event);
+					add_log_entry(1, log_buf);
+
+					auto resp = server_logging::send_session_command(req);
+					if (!resp.has_value())
+					{
+						add_log_entry(3, "EXCHANGE_PROBE failed (no response)");
+						return "FAILED";
+					}
+
+					add_log_entry(1, "EXCHANGE_PROBE response: " + resp->dump());
+					return resp->dump();
+				}
+				catch (...)
+				{
+					return "INVALID";
+				}
+			}
 			return "UNKNOWN";
 		}
 
@@ -568,6 +928,7 @@ namespace fob_control
 
 			stop_auto_wormhole();
 			stop_stop_music();
+			stop_occupy();
 		}
 	};
 }

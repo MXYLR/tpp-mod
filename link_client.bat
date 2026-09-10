@@ -13,6 +13,7 @@ set "LinkCmd=%VCTools%\link.exe"
   /MANIFESTUAC:"level='asInvoker' uiAccess='false'" ^
   /manifest:embed ^
   /DEBUG ^
+  /MAP:"build\bin\x64\Release\dinput8.map" ^
   /PDB:"build\bin\x64\Release\dinput8.pdb" ^
   /SUBSYSTEM:WINDOWS ^
   /OPT:REF ^

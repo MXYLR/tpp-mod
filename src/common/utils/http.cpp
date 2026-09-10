@@ -106,12 +106,19 @@ namespace utils::http
 
 	std::optional<http_result> post_data(const std::string& url, const std::string& data,
 		const headers& headers, const std::function<void(size_t, size_t, size_t)>& callback, 
-		const std::string& proxy)
+		const std::string& proxy, std::string* error_out)
 	{
 		curl_slist* header_list = nullptr;
 
 		auto* curl = curl_easy_init();
-		if (!curl) return {};
+		if (!curl)
+		{
+			if (error_out)
+			{
+				*error_out = "curl_easy_init failed";
+			}
+			return {};
+		}
 
 		auto _ = gsl::finally([&]()
 		{
@@ -158,6 +165,12 @@ namespace utils::http
 			res.response_code = response_code;
 
 			return {res};
+		}
+
+		if (error_out)
+		{
+			*error_out = std::string("curl_easy_perform failed: ") + curl_easy_strerror(code) +
+				" (error " + std::to_string(code) + "), HTTP response code: " + std::to_string(response_code);
 		}
 
 		if (helper.exception)

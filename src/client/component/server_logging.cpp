@@ -16,6 +16,8 @@
 #include <utils/http.hpp>
 #include <utils/cryptography.hpp>
 
+#include <mutex>
+
 namespace server_logging
 {
 	namespace
@@ -50,6 +52,7 @@ namespace server_logging
 			utils::cryptography::blowfish session_blow_;
 			std::string session_key_;
 			std::string session_key_string_;
+			std::string session_id_;
 			std::string url_;
 
 		public:
@@ -66,9 +69,28 @@ namespace server_logging
 				session_key_string_ = crypto_key;
 			}
 
+			// The session id issued by the server in CMD_REQAUTH_HTTPS.
+			// It must be sent back in the "session_key" field of every request
+			// (the server looks the player up by it); the crypto_key is only
+			// used to encrypt/decrypt the "data" payload.
+			void set_session_id(const std::string& session_id)
+			{
+				session_id_ = session_id;
+			}
+
+			const std::string& get_session_id() const
+			{
+				return session_id_;
+			}
+
+			void set_url(const std::string& url)
+			{
+				url_ = url;
+			}
+
 			bool has_session_key() const
 			{
-				return !session_key_string_.empty();
+				return !session_key_string_.empty() && !session_id_.empty();
 			}
 
 			std::string decrypt_with_static(const std::string& data)
@@ -122,40 +144,40 @@ namespace server_logging
 				return result;
 			}
 
+			std::string wrap_crlf(const std::string& b64)
+			{
+				// Insert CRLF every 76 chars without re-encoding (the input is
+				// already base64 text).
+				std::string out;
+				for (size_t i = 0; i < b64.size(); i++)
+				{
+					if (i > 0 && i % 76 == 0)
+					{
+						out += "\r\n";
+					}
+					out += b64[i];
+				}
+				while (out.size() >= 2 && out.substr(out.size() - 2) == "\r\n")
+				{
+					out.erase(out.size() - 2);
+				}
+				return out;
+			}
+
 			std::string encrypt_with_static_crlf(const std::string& data)
 			{
-				std::string padded = data;
-				const auto mod = (padded.size() % 8);
-				if (mod != 0)
-				{
-					const auto byte_count = 8 - mod;
-					for (auto i = 0ull; i < byte_count; i++)
-					{
-						padded += static_cast<char>(byte_count);
-					}
-				}
-
-				std::string encrypted_bytes;
-				for (auto offset = 0u; offset < padded.size(); offset += 8)
-				{
-					const auto chunk = padded.substr(offset, 8);
-					auto chunk_l = chunk.substr(0, 4);
-					auto chunk_r = chunk.substr(4, 4);
-
-					auto xl = static_cast<std::uint32_t>(BSWAP32(*reinterpret_cast<std::uint32_t*>(chunk_l.data())));
-					auto xr = static_cast<std::uint32_t>(BSWAP32(*reinterpret_cast<std::uint32_t*>(chunk_r.data())));
-
-					static_blow_.encrypt_single(xl, xr);
-
-					xl = BSWAP32(xl);
-					xr = BSWAP32(xr);
-
-					encrypted_bytes.append(reinterpret_cast<char*>(&xl), 4);
-					encrypted_bytes.append(reinterpret_cast<char*>(&xr), 4);
-				}
-
-				std::string base64_crlf = base64_encode_crlf(encrypted_bytes);
-				return url_encode_plus(base64_crlf);
+				// Use the exact same Blowfish encryption the game client uses.
+				// This is verified against custom_server's encrypt_data/decrypt_data
+				// (the emulator must round-trip real game traffic, so its crypto is
+				// what the official server accepts).
+				//
+				// NOTE: static_blow_.encrypt() already returns base64 text, so we
+				// must only wrap it with CRLF here. Passing it through
+				// base64_encode_crlf() (which base64-encodes again) produced a
+				// double-encoded payload that the official server rejected with an
+				// empty response body.
+				const auto encrypted_b64 = static_blow_.encrypt(data);
+				return url_encode_plus(wrap_crlf(encrypted_b64));
 			}
 
 			std::optional<std::string> send_command_and_get_response(const nlohmann::json& command_json, bool encrypt = false)
@@ -165,7 +187,7 @@ namespace server_logging
 				nlohmann::json message;
 				message["compress"] = false;
 				message["session_crypto"] = encrypt;
-				message["session_key"] = session_key_string_;
+				message["session_key"] = session_id_;
 				message["original_size"] = static_cast<int>(data_str.size());
 
 				if (encrypt)
@@ -181,17 +203,23 @@ namespace server_logging
 				std::string encrypted = encrypt_with_static_crlf(message_str);
 				std::string post_body = "httpMsg=" + encrypted;
 
+				// Diagnostic dump: write the exact request and response so the
+				// wire format can be inspected when the server rejects it.
+				utils::io::write_file("tpp-mod/diag_request.txt", post_body);
+
 				utils::http::headers headers;
 				headers["Connection"] = "Keep-Alive";
 				headers["Content-Type"] = "application/x-www-form-urlencoded";
 
 				console::info("[TPP Client] Sending command: %s", command_json["msgid"].get<std::string>().data());
 
-				auto response = utils::http::post_data(url_, post_body, headers);
+				std::string http_error;
+				auto response = utils::http::post_data(url_, post_body, headers, {}, {}, &http_error);
 
 				if (response.has_value())
 				{
-					console::info("[TPP Client] Response received!");
+					console::info("[TPP Client] Response received! HTTP status: %u", response.value().response_code);
+					utils::io::write_file("tpp-mod/diag_response.bin", response.value().buffer);
 
 					const auto& result = response.value();
 					const auto& raw = result.buffer;
@@ -248,7 +276,8 @@ namespace server_logging
 				}
 				else
 				{
-					console::error("[TPP Client] Request failed!");
+					console::error("[TPP Client] Request failed! URL: %s", url_.c_str());
+					console::error("[TPP Client] Error: %s", http_error.c_str());
 					return {};
 				}
 			}
@@ -380,6 +409,7 @@ namespace server_logging
 		};
 
 		tpp_client tpp_client_instance_;
+		std::mutex tpp_client_mutex;
 
 		std::string get_dump_path(const std::string cmd_name, const bool request)
 		{
@@ -575,6 +605,37 @@ namespace server_logging
 
 					console::info("[server logging] received response for command \"%s\"", cmd.data());
 
+					// DISABLED (crash fix): capturing the game's backend URL from
+					// NclDaemon crashed on login. The GetUrl symbol (0x1491B2A30)
+					// was never verified against the current exe and points to a
+					// jump stub with an incompatible signature; the access
+					// violation (0xc0000005) is not caught by /EHsc try/catch.
+					// The standalone TPP client falls back to the default URL
+					// (https://mgstpp-game.konamionline.com/tppstm/main).
+					// To re-enable, first verify NclDaemon_::GetUrl against the
+					// game executable and guard the dereferences with SEH.
+					/*
+					try
+					{
+						const auto ncl_daemon = *game::fox::ncl::NclDaemon_::s_instance;
+						if (ncl_daemon != nullptr)
+						{
+							const auto endpoint_id = game::fox::FoxStrHash32("WEB", std::strlen("WEB"));
+							const auto url = game::fox::ncl::NclDaemon_::GetUrl(ncl_daemon, endpoint_id);
+							if (url != nullptr && url->data != nullptr && url->data->buffer != nullptr)
+							{
+								const std::string game_url = url->data->buffer;
+								console::info("[TPP Client] Game URL: %s", game_url.c_str());
+								tpp_client_instance_.set_url(game_url);
+							}
+						}
+					}
+					catch (...)
+					{
+						console::error("[TPP Client] Failed to capture game URL from NclDaemon");
+					}
+					*/
+
 					// Capture session key from CMD_REQAUTH_HTTPS
 					if (cmd == "CMD_REQAUTH_HTTPS" || cmd == "CMD_REQAUTH")
 					{
@@ -584,6 +645,17 @@ namespace server_logging
 							tpp_session_key = crypto_key;
 							tpp_session_key_available = true;
 							tpp_client_instance_.set_session_key(crypto_key);
+
+							// The server also issues a session id ("session"
+							// field). It must be sent back in the "session_key"
+							// field of subsequent requests, otherwise the server
+							// rejects the request (empty response body).
+							if (json.contains("session") && json["session"].is_string())
+							{
+								const auto session_id = json["session"].get<std::string>();
+								tpp_client_instance_.set_session_id(session_id);
+								console::info("[TPP Client] Session id captured: %s", session_id.substr(0, 20).c_str());
+							}
 
 							console::info("[TPP Client] =============================================");
 							console::info("[TPP Client] Session key captured from %s", cmd.data());
@@ -836,7 +908,32 @@ namespace server_logging
 
 		bool public_open_wormhole(std::uint64_t target_player_id, std::uint64_t my_player_id)
 		{
+			std::lock_guard<std::mutex> lock(tpp_client_mutex);
 			return tpp_client_instance_.open_wormhole(target_player_id, my_player_id);
+		}
+
+		std::optional<nlohmann::json> public_send_session_command(const nlohmann::json& cmd)
+		{
+			std::lock_guard<std::mutex> lock(tpp_client_mutex);
+			auto response = tpp_client_instance_.send_command_and_get_response(cmd, true);
+			if (!response.has_value())
+			{
+				console::error("[OCCUPY] send_command_and_get_response returned empty (HTTP/post failure or session key missing)");
+				return {};
+			}
+
+			const auto& raw = response.value();
+			console::info("[OCCUPY] Response (first 300 chars): %s", raw.substr(0, 300).c_str());
+
+			try
+			{
+				return nlohmann::json::parse(raw);
+			}
+			catch (const std::exception& e)
+			{
+				console::error("[OCCUPY] Failed to parse response JSON: %s", e.what());
+				return {};
+			}
 		}
 	}
 
@@ -855,6 +952,11 @@ namespace server_logging
 		return public_get_my_player_id();
 	}
 
+	std::optional<nlohmann::json> send_session_command(const nlohmann::json& cmd)
+	{
+		return public_send_session_command(cmd);
+	}
+
 	class component final : public component_interface
 	{
 	public:
@@ -869,8 +971,14 @@ namespace server_logging
 			http_codec_begin_encode_hook.create(SELECT_VALUE(0x141CE2DC0, 0x140C41750, 0x0, 0x0), http_codec_begin_encode_stub);
 			http_codec_end_decode_hook.create(SELECT_VALUE(0x141CE35E0, 0x140C41F70, 0x0, 0x0), http_codec_end_decode_stub);
 
-			utils::hook::far_jump<BASE_ADDRESS>(SELECT_VALUE(0x1407DFC08, 0x14057D3C8, 0x0, 0x0), utils::hook::assemble(session_daemon_update_stub));
-			utils::hook::call(SELECT_VALUE(0x1407D2736, 0x140572156, 0x0, 0x0), net_daemon_set_heartbeat);
+			// MGO-only session daemon hooks (kept behind is_mgo() to match the
+			// original behavior; the unconditional variant could hit unverified
+			// jump/invoke targets in TPP mode and crash on login).
+			if (game::environment::is_mgo())
+			{
+				utils::hook::far_jump<BASE_ADDRESS>(SELECT_VALUE(0x1407DFC08, 0x14057D3C8, 0x0, 0x0), utils::hook::assemble(session_daemon_update_stub));
+				utils::hook::call(SELECT_VALUE(0x1407D2736, 0x140572156, 0x0, 0x0), net_daemon_set_heartbeat);
+			}
 
 			if (!game::environment::is_tpp())
 			{
@@ -1153,6 +1261,68 @@ namespace server_logging
 				console::info("  session_key: %s", tpp_session_key_available ? "AVAILABLE" : "NOT AVAILABLE");
 				console::info("  my_player_id: %llu", get_my_player_id_from_cache());
 				console::info("================================");
+			});
+
+			// fob_exchange_probe command - send a custom CMD_EXCHANGE_LEAGUE_POINT2
+			// request straight to the official server. Used to probe the server's
+			// exchange validation logic (type/unique_id matching, num_to_exchange
+			// bounds, uint32 overflow behavior, is_event table switching, ...).
+			command::add("fob_exchange_probe", [](const command::params& params)
+			{
+				if (params.size() < 3)
+				{
+					console::info("Usage: fob_exchange_probe <type> <unique_id> [num_to_exchange] [common_value] [is_event]");
+					console::info("Example: fob_exchange_probe 4 19092");
+					console::info("Example: fob_exchange_probe 4 19092 1 0 1");
+					console::info("Example: fob_exchange_probe 4 19092 4294967295 0 1   (uint32 overflow probe)");
+					console::info("Example: fob_exchange_probe 1 1 0 9 1               (num_to_exchange = 0 probe)");
+					console::info("");
+					console::info("Sends CMD_EXCHANGE_LEAGUE_POINT2 directly to the official server");
+					console::info("with the given exchange parameters and prints the raw response.");
+					console::info("Defaults: num_to_exchange=1, common_value=0, is_event=1");
+					console::info("Requires a session key from CMD_REQAUTH_HTTPS.");
+					return;
+				}
+
+				if (!tpp_client_instance_.has_session_key())
+				{
+					console::error("[Exchange Probe] No session key available!");
+					console::error("[Exchange Probe] Please login and visit the FOB menu first.");
+					return;
+				}
+
+				const auto type = params.get_uint64(1);
+				const auto unique_id = params.get_uint64(2);
+				const auto num_to_exchange = params.size() >= 4 ? params.get_uint64(3) : 1;
+				const auto common_value = params.size() >= 5 ? params.get_uint64(4) : 0;
+				const auto is_event = params.size() >= 6 ? params.get_uint64(5) : 1;
+
+				console::info("[Exchange Probe] Sending CMD_EXCHANGE_LEAGUE_POINT2:");
+				console::info("[Exchange Probe]   type=%llu unique_id=%llu num_to_exchange=%llu common_value=%llu is_event=%llu",
+					static_cast<unsigned long long>(type),
+					static_cast<unsigned long long>(unique_id),
+					static_cast<unsigned long long>(num_to_exchange),
+					static_cast<unsigned long long>(common_value),
+					static_cast<unsigned long long>(is_event));
+
+				nlohmann::json req;
+				req["msgid"] = "CMD_EXCHANGE_LEAGUE_POINT2";
+				req["rqid"] = 0;
+				req["type"] = static_cast<std::uint32_t>(type);
+				req["unique_id"] = static_cast<std::uint32_t>(unique_id);
+				req["num_to_exchange"] = static_cast<std::uint32_t>(num_to_exchange);
+				req["common_value"] = static_cast<std::uint32_t>(common_value);
+				req["is_event"] = static_cast<std::uint32_t>(is_event);
+
+				std::lock_guard<std::mutex> lock(tpp_client_mutex);
+				auto response = tpp_client_instance_.send_command_and_get_response(req, true);
+				if (!response.has_value())
+				{
+					console::error("[Exchange Probe] No response (HTTP failure or session expired).");
+					return;
+				}
+
+				console::info("[Exchange Probe] Raw response: %s", response->c_str());
 			});
 		}
 	};
