@@ -723,6 +723,11 @@ namespace renderer
 
 				const auto c = custom_metrics->string[i];
 				const auto c_next = custom_metrics->string[i + 1];
+				if (c >= 0xFFFF)
+				{
+					continue;
+				}
+
 				const auto glyph_info = &font_data.wide_char_glyphs[c];
 
 				float new_color[4]{};

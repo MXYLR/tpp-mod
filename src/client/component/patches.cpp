@@ -23,6 +23,7 @@ namespace patches
 		vars::var_ptr var_max_fps;
 		vars::var_ptr var_sensitivity;
 		vars::var_ptr var_sensitivity_patch;
+		vars::var_ptr var_menu_sensitivity;
 		vars::var_ptr var_camera_fovscale;
 		vars::var_ptr var_camera_fp_fovscale;
 		vars::var_ptr var_camera_fp_preserve;
@@ -125,7 +126,7 @@ namespace patches
 
 		float scale_ramble_speed(float speed)
 		{
-			if (var_unlock_fps->current.enabled() && var_player_ramble_speed_patch->current.enabled())
+			if (var_unlock_fps->latched.enabled() && var_player_ramble_speed_patch->current.enabled())
 			{
 				constexpr auto frame_time_60fps = 1000.0 / (60.0 * 1000.0);
 				const auto time_system = game::fox::GetTimeSystem();
@@ -229,6 +230,51 @@ namespace patches
 			var_sensitivity->set_callback->operator()();
 
 			utils::hook::jump(SELECT_VALUE(0x1409CCB60, 0x1407AFAC0, 0x0, 0x0), player_mouse_event_update_stub);
+		}
+
+		// The UI reads mouse movement only through these UixUtility methods (no other
+		// code reads the input device's mouse delta fields), so scaling here affects
+		// menus/cursor but not the aiming camera.
+		void scale_menu_mouse(float* x, float* y)
+		{
+			const auto scale = var_menu_sensitivity->current.get_float();
+
+			if (scale != 1.f)
+			{
+				*x *= scale;
+				*y *= scale;
+			}
+		}
+
+		utils::hook::detour get_mouse_move_xy_hook;
+
+		void* get_mouse_move_xy_stub(game::fox::uix::impl::UixUtilityImpl* this_, float* x, float* y)
+		{
+			const auto result = get_mouse_move_xy_hook.invoke<void*>(this_, x, y);
+			scale_menu_mouse(x, y);
+			return result;
+		}
+
+		utils::hook::detour get_mouse_accel_xy_hook;
+
+		void* get_mouse_accel_xy_stub(game::fox::uix::impl::UixUtilityImpl* this_, float* x, float* y)
+		{
+			const auto result = get_mouse_accel_xy_hook.invoke<void*>(this_, x, y);
+			scale_menu_mouse(x, y);
+			return result;
+		}
+
+		void patch_menu_sensitivity()
+		{
+			if (const auto move_xy = SELECT_VALUE(0x14050B0A0, 0x0, 0x0, 0x0); move_xy != 0)
+			{
+				get_mouse_move_xy_hook.create(move_xy, get_mouse_move_xy_stub);
+			}
+
+			if (const auto accel_xy = SELECT_VALUE(0x14050B000, 0x0, 0x0, 0x0); accel_xy != 0)
+			{
+				get_mouse_accel_xy_hook.create(accel_xy, get_mouse_accel_xy_stub);
+			}
 		}
 
 		void scale_fov(game::tpp::gm::player::impl::PlayerCameraImpl* camera, vars::var_ptr var)
@@ -424,8 +470,11 @@ namespace patches
 			var_sensitivity = vars::register_float("sensitivity", 1.f, 0.f, 10.f, 
 				vars::var_flag_saved, "mouse sensitivity scale");
 
-			var_sensitivity_patch = vars::register_bool("sensitivity_fps_patch", false, 
+			var_sensitivity_patch = vars::register_bool("sensitivity_fps_patch", false,
 				vars::var_flag_saved, "enable sensitivity scaling patch");
+
+			var_menu_sensitivity = vars::register_float("menu_sensitivity", 1.f, 0.f, 10.f,
+				vars::var_flag_saved, "mouse sensitivity scale in menus");
 
 			var_camera_fovscale = vars::register_float("camera_fovscale", 1.f, 0.1f, 5.f, 
 				vars::var_flag_saved, "camera fov scale");
@@ -438,7 +487,7 @@ namespace patches
 
 			if (game::environment::is_tpp())
 			{
-				var_player_ramble_speed_scale = vars::register_float("player_ramble_speed_scale", 1.51f, 0.f, 5.f, 
+				var_player_ramble_speed_scale = vars::register_float("player_ramble_speed_scale", 1.51f, 0.f, 100.f,
 					vars::var_flag_saved, "player sleep wake up scale (while player is trying to wake up)");
 				var_player_ramble_speed_patch = vars::register_bool("player_ramble_speed_patch", true, 
 					vars::var_flag_saved, "enable high fps player sleep wake up patch");
@@ -499,6 +548,7 @@ namespace patches
 			}
 
 			patch_sensitivity();
+			patch_menu_sensitivity();
 			patch_fov();
 		}
 
