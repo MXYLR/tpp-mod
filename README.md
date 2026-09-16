@@ -2,6 +2,8 @@
 
 Improvements and fixes for Metal Gear Solid V: The Phantom Pain
 
+based on [alicealys/tpp-mod](https://github.com/alicealys/tpp-mod)
+
 discord server
 https://discord.gg/hYfW9MEEGF
 
@@ -24,7 +26,7 @@ For older builds go here:
 - Download [dinput8.dll](https://github.com/MXYLR/tpp-mod/releases/latest/download/dinput8.dll) and copy it to the game folder.
 - Download [fob-gui.exe](https://github.com/MXYLR/tpp-mod/releases/latest/download/fob-gui.exe) and place it next to the game executable (optional, used by the FOB GUI).
 
-Configuration files are stored in the game folder (e.g. `config/config_tpp.cfg`).
+Configuration files are stored in the game folder itself (`config_tpp.cfg`, `config_mgo.cfg`, `keys_tpp.cfg`, `fob-gui.cfg`).
 
 ## Features
 
@@ -35,6 +37,26 @@ Configuration files are stored in the game folder (e.g. `config/config_tpp.cfg`)
 | <img src="assets/github/2.png?raw=true" /> |
 |:-:|
 | in game console |
+
+### Font replacement
+
+The game's own fonts can be replaced at runtime with any ttf/otf font, no `.ffnt` repacking
+needed. Point `r_font_file` at a font file or a folder and restart the game:
+
+```
+set r_font_file "C:/Windows/Fonts/SourceHanSansCN-Regular.otf"
+set r_font_chinese "1"
+```
+
+- every glyph is drawn at the size the font itself draws it at, so a kanji, a kana and the
+  latin beside it come out in the proportion the font was designed with, and the text keeps
+  the size the game's own fonts had
+- the characters the game's japanese fonts do not have are covered by the common chinese set
+  (gb2312 level 1, 3755 characters), which is what makes a translation readable at all
+- `r_font_scale` changes the size of the whole font, `r_font_kanji_scale` only its
+  kanji/kana/chinese half, `r_font_latin_scale` only its latin half
+- `r_font_ranges` and `r_font_extra` add characters beyond the ones the game already uses
+- takes effect on restart
 
 ### Security
 
@@ -49,7 +71,7 @@ To start a MGO3 dedicated server run the game with the following command:
 ```
 
 The config file can be downloaded [here](src/client/resources/server.cfg).  
-Copy it to `tpp-mod/config/` and edit it to your preference.  
+Copy it to the game folder and edit it to your preference.  
 
 ### Misc
 - discord rich presence
@@ -58,6 +80,7 @@ Copy it to `tpp-mod/config/` and edit it to your preference.
 - fps and ping counter
 - mgo text chat
 - in game console
+- ttf/otf font replacement for the game's own fonts (see: [Font replacement](#font-replacement))
 - high fps wake up time patch
 - custom security challenge list
 - kick players from your mgo lobby
@@ -132,12 +155,21 @@ similar to cod dvars, can be set through the console or through the config files
 (type their name in the console for a description)
 
 - `net_custom_server`
+- `net_proxy_url`
 - `net_channel`
+- `net_server_logging`
+- `net_server_heartbeat`
+- `whitelist_enable`
 - `discord_enable`
+- `dsx_enable`
 - `ui_mb_color`
 - `ui_color_tweaks`
 - `ui_disable_noise`
 - `ui_disable_dot_pattern`
+- `ui_draw_fps`
+- `ui_draw_ping`
+- `ui_draw_mod`
+- `ui_skip_intro`
 - `con_input_box_color`
 - `con_input_hint_box_color`
 - `con_output_bar_color`
@@ -147,24 +179,50 @@ similar to cod dvars, can be set through the console or through the config files
 - `con_input_dvar_value_color`
 - `con_input_dvar_inactive_value_color`
 - `con_input_cmd_match_color`
-- `match_enable_tweaks`
-- `match_min_players`
-- `match_max_players`
-- `match_briefing_time`
-- `ui_draw_fps`
-- `ui_draw_ping`
+- `r_custom_text_rendering`
+- `r_draw2d`
+- `r_draw_priority_test`
+- `r_fog`
+- `r_fxaa`
+- `r_font_file`
+- `r_font_name`
+- `r_font_size`
+- `r_font_scale`
+- `r_font_kanji_scale`
+- `r_font_latin_scale`
+- `r_font_x_offset`
+- `r_font_y_offset`
+- `r_font_ranges`
+- `r_font_extra`
+- `r_font_chinese`
+- `r_extra_font_1`
+- `r_extra_font_2`
 - `com_worker_count`
 - `com_unlock_fps`
 - `com_max_fps`
 - `sensitivity`
-- `camera_fov_scale`
-- `camera_first_person_fov_scale`
+- `sensitivity_fps_patch`
+- `menu_sensitivity`
+- `camera_fovscale`
+- `camera_fp_fovscale`
+- `camera_fp_preserve`
+- `player_ramble_speed_scale`
+- `player_ramble_speed_patch`
 - `name`
-- `dsx_enable`
 - `lua_logging`
 - `lua_dump`
-- `net_server_logging`
-- `net_server_heartbeat`
+- `fs_mod`
+- `sv_base_url`
+- `mapname`
+- `match_enable_tweaks`
+- `match_min_players`
+- `match_max_players`
+- `match_briefing_time`
+- `match_password`
+- `match_restricted`
+- `match_host_comment`
+- `fob_security_challenge_mode`
+- `fob_security_challenge_min_level`
 - `chat_enable`
 - `chat_time`
 - `chat_input_bg`
@@ -177,13 +235,10 @@ similar to cod dvars, can be set through the console or through the config files
 - `chat_scale`
 - `chat_direction`
 - `chat_muted_players`
-- `fob_security_challenge_mode`
 - `net_udp`
 - `net_port`
-- `player_ramble_speed_scale`
-- `player_ramble_speed_patch`
-- `ui_skip_intro`
-- `staff_cheat`
+- `cheat_enabled`
+- `cheat_disable_reporting`
 - `cheat_develop_limit`
 - `cheat_no_deployment_cost`
 - `cheat_unlockall_gear`
