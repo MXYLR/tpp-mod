@@ -1821,6 +1821,50 @@ namespace renderer
 			game::fox::FreeAnnotated(metrics, 0x5000F);
 		}
 
+		// player names can be written in one of the mathematical alphabets, which
+		// live above the bmp and so end up in the glyph table as nothing. each
+		// block holds its alphabet in order, holes included, so the plain letter
+		// is the offset from the block start
+		wchar_t transliterate_character(const std::uint32_t character)
+		{
+			constexpr struct
+			{
+				std::uint32_t first;
+				wchar_t base;
+				std::uint32_t count;
+			} alphabets[] =
+			{
+				{0x1D400, L'A', 26}, {0x1D41A, L'a', 26}, // bold
+				{0x1D434, L'A', 26}, {0x1D44E, L'a', 26}, // italic
+				{0x1D468, L'A', 26}, {0x1D482, L'a', 26}, // bold italic
+				{0x1D49C, L'A', 26}, {0x1D4B6, L'a', 26}, // script
+				{0x1D4D0, L'A', 26}, {0x1D4EA, L'a', 26}, // bold script
+				{0x1D504, L'A', 26}, {0x1D51E, L'a', 26}, // fraktur
+				{0x1D538, L'A', 26}, {0x1D552, L'a', 26}, // double struck
+				{0x1D56C, L'A', 26}, {0x1D586, L'a', 26}, // bold fraktur
+				{0x1D5A0, L'A', 26}, {0x1D5BA, L'a', 26}, // sans serif
+				{0x1D5D4, L'A', 26}, {0x1D5EE, L'a', 26}, // sans serif bold
+				{0x1D608, L'A', 26}, {0x1D622, L'a', 26}, // sans serif italic
+				{0x1D63C, L'A', 26}, {0x1D656, L'a', 26}, // sans serif bold italic
+				{0x1D670, L'A', 26}, {0x1D68A, L'a', 26}, // monospace
+				{0x1D6A4, L'i', 2}, // dotless i and j
+				{0x1D7CE, L'0', 10}, {0x1D7D8, L'0', 10}, // bold, double struck
+				{0x1D7E2, L'0', 10}, {0x1D7EC, L'0', 10}, // sans serif, sans serif bold
+				{0x1D7F6, L'0', 10}, // monospace
+			};
+
+			for (const auto& alphabet : alphabets)
+			{
+				const auto offset = character - alphabet.first;
+				if (offset < alphabet.count)
+				{
+					return static_cast<wchar_t>(alphabet.base + offset);
+				}
+			}
+
+			return 0;
+		}
+
 		void init_metrics_stub(custom_font_metrics_t* string, const char* text, int a3, int font_type)
 		{
 			game::fox::gr::InitMetrics(&string->native, text, a3, font_type);
@@ -1840,14 +1884,17 @@ namespace renderer
 				};
 			}
 
-			auto buffer = game::fox::KernelAllocAligned(count * 2, 4);
+			auto buffer = game::fox::KernelAllocAligned((count + 1) * 2, 4);
 			string->string = reinterpret_cast<wchar_t*>(buffer);
 
 			auto c = reinterpret_cast<unsigned char*>(reinterpret_cast<size_t>(text));
 			auto idx = 0;
 			do
 			{
-				string->string[idx++] = static_cast<wchar_t>(game::fox::Utf8ToUtf32(&c));
+				const auto character = game::fox::Utf8ToUtf32(&c);
+				string->string[idx++] = character >= 0xFFFF
+					? transliterate_character(character)
+					: static_cast<wchar_t>(character);
 			} while (*c != 0);
 
 			string->str_len = count;
@@ -1892,12 +1939,16 @@ namespace renderer
 				}
 
 				const auto char_idx = game::fox::Utf8ToUtf32(&c);
-				if (char_idx >= 0xFFFF || !is_char_printable(static_cast<wchar_t>(char_idx)))
+				const auto drawn_idx = char_idx >= 0xFFFF
+					? transliterate_character(char_idx)
+					: static_cast<wchar_t>(char_idx);
+
+				if (drawn_idx == 0 || !is_char_printable(drawn_idx))
 				{
 					continue;
 				}
 
-				*length += font_data.wide_char_glyphs[char_idx].metrics.f9 * scaling + spacing * (1.f / 60.f);
+				*length += font_data.wide_char_glyphs[drawn_idx].metrics.f9 * scaling + spacing * (1.f / 60.f);
 				++idx;
 			}
 
@@ -1923,7 +1974,11 @@ namespace renderer
 				}
 
 				const auto char_idx = game::fox::Utf8ToUtf32(&c);
-				if (char_idx >= 0xFFFF || !is_char_printable(static_cast<wchar_t>(char_idx)))
+				const auto drawn_idx = char_idx >= 0xFFFF
+					? transliterate_character(char_idx)
+					: static_cast<wchar_t>(char_idx);
+
+				if (drawn_idx == 0 || !is_char_printable(drawn_idx))
 				{
 					continue;
 				}

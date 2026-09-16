@@ -25,6 +25,7 @@ For older builds go here:
 
 - Download [dinput8.dll](https://github.com/MXYLR/tpp-mod/releases/latest/download/dinput8.dll) and copy it to the game folder.
 - Download [fob-gui.exe](https://github.com/MXYLR/tpp-mod/releases/latest/download/fob-gui.exe) and place it next to the game executable (optional, used by the FOB GUI).
+- Download [SourceHanSansCN-Regular.otf](https://github.com/MXYLR/tpp-mod/releases/latest/download/SourceHanSansCN-Regular.otf) if you want the game to draw characters its own fonts do not have (see: [Font replacement](#font-replacement)).
 
 Configuration files are stored in the game folder itself (`config_tpp.cfg`, `config_mgo.cfg`, `keys_tpp.cfg`, `fob-gui.cfg`).
 
@@ -57,6 +58,25 @@ set r_font_chinese "1"
   kanji/kana/chinese half, `r_font_latin_scale` only its latin half
 - `r_font_ranges` and `r_font_extra` add characters beyond the ones the game already uses
 - takes effect on restart
+
+#### Installing a font
+
+**The mod does not embed a font** — `dinput8.dll` only rasterizes one you already have. The
+game's own japanese fonts do not cover the characters a translated or modded client needs, so
+without an installed font those characters draw as blank cells. Download
+[SourceHanSansCN-Regular.otf](https://github.com/MXYLR/tpp-mod/releases/latest/download/SourceHanSansCN-Regular.otf)
+and either
+
+- drop it in the game folder next to the executable, and set
+  `set r_font_file "SourceHanSansCN-Regular.otf"`, or
+- install it system wide (right click → *Install for all users*) so the path in the example
+  above works unchanged
+
+then set `r_font_chinese "1"`, which is what pulls in the 3755 common chinese characters the
+game's japanese fonts are missing. Skip both and chinese text stays blank.
+
+The bundled font is Source Han Sans CN Regular v1.000 by Adobe, used under the
+[Apache License 2.0](assets/fonts/LICENSE-Apache-2.0.txt). Any other ttf/otf works the same way.
 
 ### Security
 
